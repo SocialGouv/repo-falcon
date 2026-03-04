@@ -168,6 +168,59 @@ Typical pipeline steps:
 
 This approach keeps the pipeline **stateless and reproducible**.
 
+---
+
+## GitHub Action usage
+
+RepoFalcon ships as a reusable composite action via [`action.yml`](action.yml:1).
+
+Example workflows are included in this repo:
+
+- [`/.github/workflows/repofalcon_pr_context.yml`](.github/workflows/repofalcon_pr_context.yml:1)
+- [`/.github/workflows/repofalcon_then_claude_review.yml`](.github/workflows/repofalcon_then_claude_review.yml:1)
+
+### Basic PR workflow (generate PR context artifacts)
+
+```yaml
+name: RepoFalcon PR context
+
+on:
+  pull_request:
+
+jobs:
+  repofalcon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate RepoFalcon artifacts
+        id: falcon
+        uses: <owner>/repo-falcon@<ref>
+        with:
+          mode: pr
+          repo: .
+          out: artifacts
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+
+      - name: Inspect outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Artifacts dir: ${{ steps.falcon.outputs.artifacts-dir }}"
+          echo "Context pack:  ${{ steps.falcon.outputs.context-pack-path }}"
+          echo "Report:        ${{ steps.falcon.outputs.review-report-path }}"
+```
+
+### Upload generated artifacts
+
+```yaml
+- name: Upload RepoFalcon artifacts
+  uses: actions/upload-artifact@v4
+  with:
+    name: repofalcon-artifacts
+    path: ${{ steps.falcon.outputs.artifacts-dir }}
+    if-no-files-found: error
+```
+
 ### CI usage (GitHub Actions)
 
 This repo ships a minimal GitHub Actions workflow at [`/.github/workflows/ci.yml`](.github/workflows/ci.yml:1).

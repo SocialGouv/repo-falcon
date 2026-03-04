@@ -1,0 +1,108 @@
+name: RepoFalcon
+description: Generate deterministic RepoFalcon artifacts (Parquet tables + optional PR context pack) for downstream review tooling.
+
+inputs:
+  repo:
+    description: Path to the repository root (relative to $GITHUB_WORKSPACE).
+    required: false
+    default: .
+  out:
+    description: Output directory for generated artifacts (relative to $GITHUB_WORKSPACE).
+    required: false
+    default: artifacts
+  base:
+    description: Git base ref/sha (required when mode=pr).
+    required: false
+  head:
+    description: Git head ref/sha (required when mode=pr).
+    required: false
+  mode:
+    description: "Execution mode: index (index only), snapshot (index+snapshot), pr (index+snapshot+pr-pack)."
+    required: false
+    default: pr
+  go-version:
+    description: Go toolchain version to use.
+    required: false
+    default: 1.22.x
+
+outputs:
+  artifacts-dir:
+    description: Absolute path to the artifacts output directory.
+    value: ${{ steps.repofalcon.outputs.artifacts-dir }}
+  context-pack-path:
+    description: Absolute path to pr_context_pack.json (only when mode=pr; empty otherwise).
+    value: ${{ steps.repofalcon.outputs.context-pack-path }}
+  review-report-path:
+    description: Absolute path to review_report.md (only when mode=pr; empty otherwise).
+    value: ${{ steps.repofalcon.outputs.review-report-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository to analyze
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        path: ${{ inputs.repo }}
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: true
+
+    - name: Run RepoFalcon
+      id: repofalcon
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+
+        mode="${{ inputs.mode }}"
+        repo_rel="${{ inputs.repo }}"
+        out_rel="${{ inputs.out }}"
+
+        repo_abs="${GITHUB_WORKSPACE}/${repo_rel}"
+        out_abs="${GITHUB_WORKSPACE}/${out_rel}"
+
+        mkdir -p "${out_abs}"
+
+        case "${mode}" in
+          index)
+            go run ./cmd/falcon index --repo "${repo_abs}" --out "${out_abs}"
+            ;;
+          snapshot)
+            go run ./cmd/falcon index --repo "${repo_abs}" --out "${out_abs}"
+            go run ./cmd/falcon snapshot --in "${out_abs}" --out "${out_abs}"
+            ;;
+          pr)
+            base="${{ inputs.base }}"
+            head="${{ inputs.head }}"
+            if [[ -z "${base}" || -z "${head}" ]]; then
+              echo "inputs.base and inputs.head are required when inputs.mode=pr" >&2
+              exit 1
+            fi
+
+            go run ./cmd/falcon index --repo "${repo_abs}" --out "${out_abs}"
+            go run ./cmd/falcon snapshot --in "${out_abs}" --out "${out_abs}"
+            go run ./cmd/falcon pr-pack --repo "${repo_abs}" --snapshot "${out_abs}" --base "${base}" --head "${head}" --out "${out_abs}"
+            ;;
+          *)
+            echo "invalid inputs.mode: ${mode} (expected: index|snapshot|pr)" >&2
+            exit 1
+            ;;
+        esac
+
+        context_pack="${out_abs}/pr_context_pack.json"
+        review_report="${out_abs}/review_report.md"
+
+        echo "artifacts-dir=${out_abs}" >> "${GITHUB_OUTPUT}"
+        if [[ "${mode}" == "pr" ]]; then
+          test -f "${context_pack}"
+          test -f "${review_report}"
+          echo "context-pack-path=${context_pack}" >> "${GITHUB_OUTPUT}"
+          echo "review-report-path=${review_report}" >> "${GITHUB_OUTPUT}"
+        else
+          echo "context-pack-path=" >> "${GITHUB_OUTPUT}"
+          echo "review-report-path=" >> "${GITHUB_OUTPUT}"
+        fi

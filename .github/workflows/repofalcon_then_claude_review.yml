@@ -1,0 +1,56 @@
+name: RepoFalcon -> PR review action (template)
+
+on:
+  pull_request:
+
+jobs:
+  repofalcon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate RepoFalcon artifacts
+        id: falcon
+        uses: ./
+        with:
+          mode: pr
+          repo: .
+          out: artifacts
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+
+      - name: Upload artifacts for downstream job
+        uses: actions/upload-artifact@v4
+        with:
+          name: repofalcon-artifacts
+          path: ${{ steps.falcon.outputs.artifacts-dir }}
+          if-no-files-found: error
+
+  pr_review:
+    runs-on: ubuntu-latest
+    needs: repofalcon
+    steps:
+      - name: Download RepoFalcon artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: repofalcon-artifacts
+          path: artifacts
+
+      - name: Prepare PR context pack for downstream review action
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f artifacts/pr_context_pack.json
+          echo "PR_CONTEXT_PACK_PATH=${GITHUB_WORKSPACE}/artifacts/pr_context_pack.json" >> "${GITHUB_ENV}"
+
+          test -f artifacts/review_report.md
+          echo "Review report (first 200 lines):"
+          sed -n '1,200p' artifacts/review_report.md
+
+      # Template: replace the action reference and input name(s) to match your PR review action.
+      # - name: Claude-style PR review (template)
+      #   uses: <owner>/<claude-pr-review-action>@<ref>
+      #   with:
+      #     context-pack-path: ${{ env.PR_CONTEXT_PACK_PATH }}
+      #   env:
+      #     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+

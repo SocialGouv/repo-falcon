@@ -1,0 +1,26 @@
+name: RepoFalcon - PR context artifacts
+
+on:
+  pull_request:
+
+jobs:
+  repofalcon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate RepoFalcon artifacts (index + snapshot + pr-pack)
+        id: falcon
+        uses: ./
+        with:
+          mode: pr
+          repo: .
+          out: artifacts
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+
+      - name: Upload RepoFalcon artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repofalcon-artifacts
+          path: ${{ steps.falcon.outputs.artifacts-dir }}
+          if-no-files-found: error
+
