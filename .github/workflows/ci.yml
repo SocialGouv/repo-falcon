@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: gofmt (check)
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(find . -name '*.go' -not -path './vendor/*' -print)
+          if [[ -n "${files}" ]]; then
+            unformatted=$(gofmt -l ${files})
+            if [[ -n "${unformatted}" ]]; then
+              echo "gofmt needed on:"
+              echo "${unformatted}"
+              exit 1
+            fi
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+      - name: Smoke test (CLI)
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=/tmp/repofalcon-artifacts
+          rm -rf "${out}"
+          go run ./cmd/falcon index --repo testdata/tinyrepo_go_js --out "${out}"
+          go run ./cmd/falcon snapshot --in "${out}" --out "${out}"
+          test -f "${out}/metadata.json"
+
