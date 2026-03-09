@@ -1,3 +1,4 @@
 artifacts
 /falcon
 /bin
+.claude/*.local.json

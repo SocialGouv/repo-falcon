@@ -21,6 +21,7 @@ These tools are faster and more accurate than grep — they use a pre-computed d
 // mcpServerConfig returns a JSON-compatible map for the falcon MCP server entry.
 func mcpServerConfig(falconBin, snapshotDir string) map[string]any {
 	return map[string]any{
+		"type":    "stdio",
 		"command": falconBin,
 		"args":    []string{"mcp", "serve", "--snapshot", snapshotDir, "--repo", "."},
 	}

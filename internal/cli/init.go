@@ -177,7 +177,7 @@ func configureAgent(id agentsetup.AgentID, repoRoot, falconBin string, lg *slog.
 		if err := agentsetup.ConfigureClaude(repoRoot, falconBin); err != nil {
 			return fmt.Errorf("claude setup: %w", err)
 		}
-		lg.Info("  created/updated CLAUDE.md and .claude/settings.json")
+		lg.Info("  created/updated CLAUDE.md and .mcp.json")
 	case agentsetup.AgentRoo:
 		lg.Info("configuring Roo Code", "repo", repoRoot)
 		if err := agentsetup.ConfigureRoo(repoRoot, falconBin); err != nil {

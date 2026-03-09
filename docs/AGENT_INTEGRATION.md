@@ -122,7 +122,7 @@ Use the `--agents` flag to skip the prompt:
 
 | Agent | Instruction file | MCP config |
 |-------|-----------------|------------|
-| Claude Code | `CLAUDE.md` (marker section) | `.claude/settings.json` |
+| Claude Code | `CLAUDE.md` (marker section) | `.mcp.json` |
 | Roo Code | `.roo/rules/falcon.md` | `.roo/mcp.json` |
 | Cline | `.clinerules` (marker section) | `.cline/mcp_settings.json` |
 
@@ -151,7 +151,7 @@ This repository has a code knowledge graph available via MCP tools (`falcon_*`).
 <!-- END FALCON -->
 ```
 
-And `.claude/settings.json` will contain (merged with any existing settings):
+And `.mcp.json` will contain (merged with any existing settings):
 
 ```json
 {
@@ -238,7 +238,7 @@ The server loads graph artifacts at startup and serves over stdio using the Mode
 
 **Manual setup:**
 
-1. Add MCP server to `.claude/settings.json`:
+1. Add MCP server to `.mcp.json`:
 
 ```json
 {

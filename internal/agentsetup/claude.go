@@ -8,7 +8,7 @@ import (
 
 // ConfigureClaude sets up Claude Code integration for the given repository.
 // It creates/updates CLAUDE.md with falcon instructions and configures
-// the MCP server in .claude/settings.json.
+// the MCP server in .mcp.json.
 func ConfigureClaude(repoRoot, falconBin string) error {
 	// 1. Update CLAUDE.md with falcon instructions.
 	claudeMD := filepath.Join(repoRoot, "CLAUDE.md")
@@ -16,8 +16,8 @@ func ConfigureClaude(repoRoot, falconBin string) error {
 		return err
 	}
 
-	// 2. Configure MCP server in .claude/settings.json.
-	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
+	// 2. Configure MCP server in .mcp.json.
+	settingsPath := filepath.Join(repoRoot, ".mcp.json")
 	snapshotDir := filepath.Join(repoRoot, ".falcon", "artifacts")
 	return upsertClaudeSettings(settingsPath, falconBin, snapshotDir)
 }
