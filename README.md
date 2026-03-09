@@ -258,6 +258,20 @@ By exposing this structure, developers and tools gain a much clearer understandi
 
 ---
 
+## Development
+
+### Prerequisites
+
+- **direnv** (recommended) — automatically loads the repo environment.
+  - Install: https://direnv.net/docs/installation.html
+  - After install (once):
+    - `direnv allow`
+- **devbox** — provides a reproducible toolchain (Go, Node, pnpm, task, etc.).
+  - Install: https://www.jetify.com/devbox/docs/installing_devbox/
+  - Note: devbox uses **Nix** under the hood; the devbox installer will guide you.
+
+---
+
 ## Status
 
 RepoFalcon is under active development.
