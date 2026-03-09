@@ -10,6 +10,12 @@
     "release": true,
     "releaseName": "v${version}"
   },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": "conventionalcommits",
+      "infile": false
+    }
+  },
   "hooks": {
     "after:bump": "make build"
   }
