@@ -70,6 +70,34 @@ The resulting graph can power architecture analysis, dependency exploration, and
 
 ---
 
+## Install
+
+Download the latest binary for your platform:
+
+```bash
+curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" | sudo tee /usr/local/bin/falcon > /dev/null && sudo chmod +x /usr/local/bin/falcon
+```
+
+Or install to a local directory:
+
+```bash
+curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" -o ./falcon && chmod +x ./falcon
+```
+
+**Windows** (PowerShell):
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-windows-amd64.exe" -OutFile falcon.exe
+```
+
+Verify the download (optional):
+
+```bash
+curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/').sha256" | sha256sum -c
+```
+
+---
+
 ## Quickstart
 
 Build the CLI:
