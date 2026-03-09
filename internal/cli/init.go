@@ -79,19 +79,8 @@ code knowledge graph via MCP tools and static context files.`,
 			selectedAgents := resolveAgents(agents, lg)
 			if len(selectedAgents) > 0 {
 				lg.Info("step 4/4: configuring coding agents")
-				falconBin, err := resolveExe()
-				if err != nil {
-					lg.Warn("could not resolve falcon binary path, using 'falcon'", "err", err)
-					falconBin = "falcon"
-				}
-
-				absRepo, err := filepath.Abs(repoDir)
-				if err != nil {
-					absRepo = repoDir
-				}
-
 				for _, id := range selectedAgents {
-					if err := configureAgent(id, absRepo, falconBin, lg); err != nil {
+					if err := configureAgent(id, repoDir, "falcon", lg); err != nil {
 						lg.Warn("failed to configure agent", "agent", string(id), "err", err)
 					}
 				}
@@ -158,15 +147,6 @@ func resolveAgents(flagVal string, lg *slog.Logger) []agentsetup.AgentID {
 	// Non-interactive without --agents: skip.
 	lg.Info("non-interactive mode: use --agents flag to configure coding agents")
 	return nil
-}
-
-// resolveExe returns the absolute path to the current falcon binary.
-func resolveExe() (string, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Abs(exe)
 }
 
 // configureAgent dispatches to the appropriate agent configurator.

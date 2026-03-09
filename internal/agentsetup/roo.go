@@ -21,11 +21,10 @@ func ConfigureRoo(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .roo/mcp.json.
-	snapshotDir := filepath.Join(repoRoot, ".falcon", "artifacts")
-	return upsertRooMCP(filepath.Join(repoRoot, ".roo", "mcp.json"), falconBin, snapshotDir)
+	return upsertRooMCP(filepath.Join(repoRoot, ".roo", "mcp.json"), falconBin)
 }
 
-func upsertRooMCP(mcpPath, falconBin, snapshotDir string) error {
+func upsertRooMCP(mcpPath, falconBin string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -42,7 +41,7 @@ func upsertRooMCP(mcpPath, falconBin, snapshotDir string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin, snapshotDir)
+	mcpServers["falcon"] = mcpServerConfig(falconBin)
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

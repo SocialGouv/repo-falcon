@@ -18,11 +18,10 @@ func ConfigureClaude(repoRoot, falconBin string) error {
 
 	// 2. Configure MCP server in .mcp.json.
 	settingsPath := filepath.Join(repoRoot, ".mcp.json")
-	snapshotDir := filepath.Join(repoRoot, ".falcon", "artifacts")
-	return upsertClaudeSettings(settingsPath, falconBin, snapshotDir)
+	return upsertClaudeSettings(settingsPath, falconBin)
 }
 
-func upsertClaudeSettings(settingsPath, falconBin, snapshotDir string) error {
+func upsertClaudeSettings(settingsPath, falconBin string) error {
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		return err
 	}
@@ -39,7 +38,7 @@ func upsertClaudeSettings(settingsPath, falconBin, snapshotDir string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin, snapshotDir)
+	mcpServers["falcon"] = mcpServerConfig(falconBin)
 	settings["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(settings, "", "  ")

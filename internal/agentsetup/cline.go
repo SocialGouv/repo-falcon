@@ -17,11 +17,10 @@ func ConfigureCline(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .cline/mcp_settings.json.
-	snapshotDir := filepath.Join(repoRoot, ".falcon", "artifacts")
-	return upsertClineMCP(filepath.Join(repoRoot, ".cline", "mcp_settings.json"), falconBin, snapshotDir)
+	return upsertClineMCP(filepath.Join(repoRoot, ".cline", "mcp_settings.json"), falconBin)
 }
 
-func upsertClineMCP(mcpPath, falconBin, snapshotDir string) error {
+func upsertClineMCP(mcpPath, falconBin string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -38,7 +37,7 @@ func upsertClineMCP(mcpPath, falconBin, snapshotDir string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin, snapshotDir)
+	mcpServers["falcon"] = mcpServerConfig(falconBin)
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

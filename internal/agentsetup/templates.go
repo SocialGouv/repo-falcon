@@ -16,13 +16,13 @@ This repository has a pre-built code knowledge graph. You MUST use the ` + "`fal
 
 These tools are faster and more accurate than grep — they use a pre-computed dependency graph with full symbol resolution.
 
-**Static context:** See ` + "`.falcon/CONTEXT.md`" + ` for a full architecture summary you should read at the start of a session.`
+If the MCP tools are unavailable, read ` + "`.falcon/CONTEXT.md`" + ` for a static architecture summary as a fallback.`
 
 // mcpServerConfig returns a JSON-compatible map for the falcon MCP server entry.
-func mcpServerConfig(falconBin, snapshotDir string) map[string]any {
+func mcpServerConfig(falconBin string) map[string]any {
 	return map[string]any{
 		"type":    "stdio",
 		"command": falconBin,
-		"args":    []string{"mcp", "serve", "--snapshot", snapshotDir, "--repo", "."},
+		"args":    []string{"mcp", "serve"},
 	}
 }
