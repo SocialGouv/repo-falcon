@@ -1,7 +1,5 @@
 # RepoFalcon 🦅
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-
 **RepoFalcon** gives you a bird’s‑eye view of your codebase.
 
 It analyzes a repository, extracts structural relationships, and builds a **code knowledge graph** that helps developers understand large codebases, review pull requests more effectively, and detect architectural or security risks.
