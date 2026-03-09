@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"repofalcon/internal/appinfo"
 	"repofalcon/internal/logging"
 )
 
@@ -23,6 +24,7 @@ func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "falcon",
 		Short:         "RepoFalcon CLI",
+		Version:       appinfo.FullVersion(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
