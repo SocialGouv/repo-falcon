@@ -1,0 +1,8 @@
+{
+  "name": "repofalcon",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "release-it": "^18"
+  }
+}

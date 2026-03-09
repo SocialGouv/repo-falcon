@@ -1,4 +1,5 @@
 artifacts
 /falcon
 /bin
+node_modules/
 .claude/*.local.json

@@ -1,6 +1,9 @@
 .PHONY: test fmt vet ci build
 
 GO ?= go
+VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null || echo "dev")
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "")
+LDFLAGS := -X repofalcon/internal/appinfo.Version=v$(VERSION) -X repofalcon/internal/appinfo.Commit=$(COMMIT)
 
 test:
 	$(GO) test ./...
@@ -22,5 +25,5 @@ ci:
 	$(GO) test ./...
 
 build:
-	$(GO) build -o bin/falcon ./cmd/falcon
+	$(GO) build -ldflags "$(LDFLAGS)" -o bin/falcon ./cmd/falcon
 
