@@ -3,6 +3,10 @@ name: RepoFalcon - PR context artifacts
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   repofalcon:
     runs-on: ubuntu-latest
