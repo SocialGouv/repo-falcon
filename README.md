@@ -77,40 +77,38 @@ The resulting graph can power architecture analysis, dependency exploration, and
 Build the CLI:
 
 ```bash
-go build -o falcon ./cmd/falcon
+go build -o bin/falcon ./cmd/falcon
 ```
 
-Index a repository (writes initial Parquet tables + `metadata.json`):
+One-command setup (index + snapshot + agent context):
 
 ```bash
-./falcon index --repo . --out artifacts
+./falcon init --repo .
 ```
 
-Materialize a deterministic snapshot (normalizes ordering, materializes `nodes.parquet`, rewrites `edges.parquet`):
+Or run the steps individually:
 
 ```bash
-./falcon snapshot --in artifacts --out artifacts
-```
-
-Generate a PR context pack between two git refs:
-
-```bash
-./falcon pr-pack --repo . --snapshot artifacts --base <base-sha-or-ref> --head <head-sha-or-ref>
+./falcon index --repo . --out .falcon/artifacts
+./falcon snapshot --in .falcon/artifacts --out .falcon/artifacts
+./falcon pr-pack --repo . --snapshot .falcon/artifacts --base <base-sha-or-ref> --head <head-sha-or-ref>
 ```
 
 Artifacts produced:
 
 ```
-artifacts/
-  metadata.json
-  files.parquet
-  symbols.parquet
-  packages.parquet
-  edges.parquet
-  findings.parquet
-  nodes.parquet
-  pr_context_pack.json
-  review_report.md
+.falcon/
+  artifacts/
+    metadata.json
+    files.parquet
+    symbols.parquet
+    packages.parquet
+    edges.parquet
+    findings.parquet
+    nodes.parquet
+    pr_context_pack.json
+    review_report.md
+  CONTEXT.md
 ```
 
 These artifacts can be consumed by CI pipelines, developer tools, or AI systems.
@@ -240,6 +238,17 @@ go test ./...
 ```
 
 For deterministic artifacts in CI, run `snapshot` after `index`. Details: [`docs/CI.md`](docs/CI.md:1).
+
+---
+
+## Coding Agent Integration
+
+RepoFalcon can expose its code knowledge graph to coding agents (Claude Code, Roo Code, Cline, Cursor, etc.) via two methods:
+
+1. **One command**: `./falcon init --repo .` (generates everything under `.falcon/`)
+2. **MCP server**: `./falcon mcp serve --snapshot .falcon/artifacts`
+
+See [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md) for setup guides.
 
 ---
 

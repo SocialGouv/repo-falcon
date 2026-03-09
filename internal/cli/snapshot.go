@@ -22,7 +22,7 @@ func newSnapshotCmd() *cobra.Command {
 
 			inDir := in
 			if inDir == "" {
-				inDir = "artifacts"
+				inDir = ".falcon/artifacts"
 			}
 			inDir = filepath.Clean(inDir)
 
@@ -65,7 +65,7 @@ func newSnapshotCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&in, "in", "artifacts", "input artifacts directory")
+	cmd.Flags().StringVar(&in, "in", ".falcon/artifacts", "input artifacts directory")
 	cmd.Flags().StringVar(&out, "out", "", "output artifacts directory (default: same as --in)")
 	_ = cmd.MarkFlagDirname("in")
 	_ = cmd.MarkFlagDirname("out")

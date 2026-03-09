@@ -127,7 +127,7 @@ func newPRPackCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&repo, "repo", ".", "path to repository root")
-	cmd.Flags().StringVar(&snapshot, "snapshot", "artifacts", "path to existing snapshot artifacts")
+	cmd.Flags().StringVar(&snapshot, "snapshot", ".falcon/artifacts", "path to existing snapshot artifacts")
 	cmd.Flags().StringVar(&base, "base", "", "git base ref")
 	cmd.Flags().StringVar(&head, "head", "", "git head ref")
 	cmd.Flags().StringVar(&out, "out", "", "output directory (default: --snapshot)")

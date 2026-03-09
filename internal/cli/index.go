@@ -169,7 +169,7 @@ func newIndexCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&repoRootFlag, "repo", ".", "path to repository root")
-	cmd.Flags().StringVar(&out, "out", "artifacts", "output directory")
+	cmd.Flags().StringVar(&out, "out", ".falcon/artifacts", "output directory")
 
 	if err := cmd.MarkFlagDirname("repo"); err != nil {
 		return cmd
@@ -178,7 +178,7 @@ func newIndexCmd() *cobra.Command {
 		return cmd
 	}
 
-	cmd.Example = "falcon index --repo . --out artifacts"
+	cmd.Example = "falcon index --repo . --out .falcon/artifacts"
 	cmd.Args = cobra.NoArgs
 	cmd.SetHelpTemplate(fmt.Sprintf("%s\n", cmd.HelpTemplate()))
 	return cmd

@@ -41,9 +41,12 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&rf.LogLevel, "log-level", "info", "log level (debug, info, warn, error)")
 
+	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newIndexCmd())
 	cmd.AddCommand(newSnapshotCmd())
 	cmd.AddCommand(newPRPackCmd())
+	cmd.AddCommand(newAgentContextCmd())
+	cmd.AddCommand(newMCPCmd())
 
 	// Cobra's default help/usage outputs include timestamps only if we log them; we don't.
 	cmd.SetContext(context.Background())
