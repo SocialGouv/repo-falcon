@@ -73,19 +73,96 @@ This makes agents proactive about querying the graph rather than falling back to
 
 ---
 
-## Prerequisites
+## Quick Start
 
-Generate the graph artifacts first:
+Build and initialize in one command:
 
 ```bash
-# Build
 go build -o falcon ./cmd/falcon
-
-# One command does everything (index + snapshot + context file)
 ./falcon init --repo .
 ```
 
-This creates `.falcon/artifacts/` (Parquet graph data) and `.falcon/CONTEXT.md` (markdown summary).
+This runs the full pipeline:
+1. **Index** — parses the repository and extracts the code graph
+2. **Snapshot** — materializes a deterministic snapshot as Parquet files
+3. **Agent context** — generates `.falcon/CONTEXT.md` (markdown summary)
+4. **Agent setup** — interactively asks which coding agents you use and configures them
+
+### Interactive agent setup
+
+When running in a terminal, `falcon init` prompts you to select your coding agents:
+
+```
+Which coding agents do you use? (select numbers, comma-separated)
+
+  1) Claude Code
+  2) Roo Code
+  3) Cline
+
+Enter selection (e.g. 1,2 or 'all'), or press Enter to skip:
+```
+
+For each selected agent, falcon automatically:
+- Creates/updates the agent's instruction file with falcon MCP tool guidance
+- Configures the MCP server in the agent's settings
+
+### Non-interactive mode
+
+Use the `--agents` flag to skip the prompt:
+
+```bash
+# Configure specific agents
+./falcon init --repo . --agents claude,roo,cline
+
+# Skip agent setup entirely
+./falcon init --repo . --agents none
+```
+
+### What gets created
+
+| Agent | Instruction file | MCP config |
+|-------|-----------------|------------|
+| Claude Code | `CLAUDE.md` (marker section) | `.claude/settings.json` |
+| Roo Code | `.roo/rules/falcon.md` | `.roo/mcp.json` |
+| Cline | `.clinerules` (marker section) | `.cline/mcp_settings.json` |
+
+The instruction files contain guidance on when and how to use the `falcon_*` MCP tools. The MCP config files point to the falcon binary with the correct arguments.
+
+Files that support marker sections (`CLAUDE.md`, `.clinerules`) use `<!-- BEGIN FALCON -->` / `<!-- END FALCON -->` markers for idempotent updates — running `falcon init` again replaces the falcon section without touching your other content.
+
+### Example CLAUDE.md
+
+After running `falcon init --repo . --agents claude`, your `CLAUDE.md` will contain:
+
+```markdown
+<!-- BEGIN FALCON -->
+## RepoFalcon Code Knowledge Graph
+
+This repository has a code knowledge graph available via MCP tools (`falcon_*`).
+
+**When to use:**
+- Before modifying a file, call `falcon_file_context` to see its dependencies and dependents
+- Before refactoring, call `falcon_architecture` for package boundaries and dependency direction
+- To find all usages of a symbol, use `falcon_symbol_lookup` instead of grep
+- To search structurally, use `falcon_search` for packages, files, or symbols by name
+- After major refactoring (renamed packages, moved files), call `falcon_refresh` to re-index
+
+**Static context:** See `.falcon/CONTEXT.md` for a full architecture summary.
+<!-- END FALCON -->
+```
+
+And `.claude/settings.json` will contain (merged with any existing settings):
+
+```json
+{
+  "mcpServers": {
+    "falcon": {
+      "command": "/absolute/path/to/falcon",
+      "args": ["mcp", "serve", "--snapshot", "/absolute/path/to/.falcon/artifacts", "--repo", "."]
+    }
+  }
+}
+```
 
 ---
 
@@ -147,82 +224,84 @@ The server loads graph artifacts at startup and serves over stdio using the Mode
 | `falcon_symbol_lookup` | Symbol details and relationships | `name` (required), `kind` (optional) |
 | `falcon_package_info` | Package contents, dependencies, dependents | `name` (required) |
 | `falcon_search` | Search files, symbols, or packages by name | `query` (required), `scope` (optional) |
+| `falcon_refresh` | Re-index the repository and reload the graph | none |
 
 ---
 
 ## Agent Setup Guides
 
+> **Recommended**: Use `falcon init --repo .` for automatic setup. The manual instructions below are for reference or custom configurations.
+
 ### Claude Code
 
-**Option A: Static context file**
+**Automatic** (recommended): `falcon init --repo . --agents claude`
 
-Place the context file where Claude Code reads project context:
+**Manual setup:**
 
-```bash
-# Alongside CLAUDE.md (auto-loaded)
-./falcon agent-context --snapshot .falcon/artifacts --out AGENTS.md
-```
-
-Or reference it from your `CLAUDE.md`:
-
-```markdown
-For repository architecture details, see .falcon/CONTEXT.md
-```
-
-**Option B: MCP server**
-
-Add to `.claude/settings.json`:
+1. Add MCP server to `.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "falcon": {
-      "command": "./falcon",
-      "args": ["mcp", "serve", "--snapshot", ".falcon/artifacts"]
+      "command": "/path/to/falcon",
+      "args": ["mcp", "serve", "--snapshot", "/path/to/.falcon/artifacts", "--repo", "."]
     }
   }
 }
 ```
 
-Claude Code will then have access to all `falcon_*` tools for querying the graph.
+2. Add usage instructions to `CLAUDE.md` (see example above)
+
+3. Optionally reference the static context file:
+
+```markdown
+For repository architecture details, see .falcon/CONTEXT.md
+```
 
 ### Roo Code
 
-**Option A: Static context file**
+**Automatic** (recommended): `falcon init --repo . --agents roo`
 
-```bash
-mkdir -p .roo/rules
-./falcon agent-context --snapshot .falcon/artifacts --out .roo/rules/architecture.md
-```
+**Manual setup:**
 
-**Option B: MCP server**
-
-Configure the MCP server in Roo Code's settings following its MCP configuration format, pointing to `./falcon mcp serve --snapshot .falcon/artifacts`.
-
-### Cline
-
-**Option A: Static context file**
-
-```bash
-./falcon agent-context --snapshot .falcon/artifacts --out .clinerules/architecture.md
-```
-
-**Option B: MCP server**
-
-Configure in Cline's MCP settings:
+1. Create `.roo/rules/falcon.md` with falcon usage instructions
+2. Configure MCP in `.roo/mcp.json`:
 
 ```json
 {
-  "falcon": {
-    "command": "./falcon",
-    "args": ["mcp", "serve", "--snapshot", ".falcon/artifacts"]
+  "mcpServers": {
+    "falcon": {
+      "command": "/path/to/falcon",
+      "args": ["mcp", "serve", "--snapshot", "/path/to/.falcon/artifacts", "--repo", "."]
+    }
+  }
+}
+```
+
+### Cline
+
+**Automatic** (recommended): `falcon init --repo . --agents cline`
+
+**Manual setup:**
+
+1. Add falcon usage instructions to `.clinerules`
+2. Configure MCP in `.cline/mcp_settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "falcon": {
+      "command": "/path/to/falcon",
+      "args": ["mcp", "serve", "--snapshot", "/path/to/.falcon/artifacts", "--repo", "."]
+    }
   }
 }
 ```
 
 ### Cursor
 
-**Static context file:**
+**Static context file** (no automatic setup yet):
 
 ```bash
 mkdir -p .cursor/rules

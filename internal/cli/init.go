@@ -2,12 +2,16 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"repofalcon/internal/agentctx"
+	"repofalcon/internal/agentsetup"
 	"repofalcon/internal/artifacts"
 	"repofalcon/internal/logging"
 )
@@ -16,18 +20,20 @@ func newInitCmd() *cobra.Command {
 	var repoRoot string
 	var out string
 	var contextOut string
+	var agents string
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Index, snapshot, and generate agent context in one step",
 		Long: `Runs the full pipeline to make a repository ready for coding agents:
 
-  1. falcon index   — parse the repo and extract the code graph
-  2. falcon snapshot — materialize a deterministic snapshot
+  1. falcon index         — parse the repo and extract the code graph
+  2. falcon snapshot      — materialize a deterministic snapshot
   3. falcon agent-context — generate a markdown summary for agents
+  4. agent setup          — configure your coding agents (interactive or via --agents)
 
-After running this command, configure your agent's MCP server to point at
-the artifacts directory, or use the generated context file directly.`,
+After running this command, your coding agents will have access to the
+code knowledge graph via MCP tools and static context files.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			lg := logging.Default()
 			ctx := cmd.Context()
@@ -42,7 +48,7 @@ the artifacts directory, or use the generated context file directly.`,
 			}
 
 			// Step 1: index.
-			lg.Info("step 1/3: indexing repository", "repo", repoDir, "out", outDir)
+			lg.Info("step 1/4: indexing repository", "repo", repoDir, "out", outDir)
 			indexCmd := newIndexCmd()
 			indexCmd.SetContext(ctx)
 			indexCmd.SetArgs([]string{"--repo", repoDir, "--out", outDir})
@@ -51,7 +57,7 @@ the artifacts directory, or use the generated context file directly.`,
 			}
 
 			// Step 2: snapshot.
-			lg.Info("step 2/3: materializing snapshot")
+			lg.Info("step 2/4: materializing snapshot")
 			snapshotCmd := newSnapshotCmd()
 			snapshotCmd.SetContext(ctx)
 			snapshotCmd.SetArgs([]string{"--in", outDir, "--out", outDir})
@@ -64,9 +70,33 @@ the artifacts directory, or use the generated context file directly.`,
 			if ctxOut == "" {
 				ctxOut = filepath.Join(repoDir, ".falcon", "CONTEXT.md")
 			}
-			lg.Info("step 3/3: generating agent context", "out", ctxOut)
+			lg.Info("step 3/4: generating agent context", "out", ctxOut)
 			if err := agentctx.WriteContext(ctx, outDir, ctxOut, "markdown"); err != nil {
 				return err
+			}
+
+			// Step 4: agent setup.
+			selectedAgents := resolveAgents(agents, lg)
+			if len(selectedAgents) > 0 {
+				lg.Info("step 4/4: configuring coding agents")
+				falconBin, err := resolveExe()
+				if err != nil {
+					lg.Warn("could not resolve falcon binary path, using 'falcon'", "err", err)
+					falconBin = "falcon"
+				}
+
+				absRepo, err := filepath.Abs(repoDir)
+				if err != nil {
+					absRepo = repoDir
+				}
+
+				for _, id := range selectedAgents {
+					if err := configureAgent(id, absRepo, falconBin, lg); err != nil {
+						lg.Warn("failed to configure agent", "agent", string(id), "err", err)
+					}
+				}
+			} else {
+				lg.Info("step 4/4: skipping agent setup (no agents selected)")
 			}
 
 			lg.Info("init complete — repository is ready for coding agents",
@@ -80,14 +110,88 @@ the artifacts directory, or use the generated context file directly.`,
 	cmd.Flags().StringVar(&repoRoot, "repo", ".", "path to repository root")
 	cmd.Flags().StringVar(&out, "out", ".falcon/artifacts", "output directory for artifacts")
 	cmd.Flags().StringVar(&contextOut, "context-out", "", "output path for context file (default: <repo>/.falcon/CONTEXT.md)")
+	cmd.Flags().StringVar(&agents, "agents", "", "comma-separated list of agents to configure: claude,roo,cline (interactive prompt if omitted)")
 	_ = cmd.MarkFlagDirname("repo")
 	_ = cmd.MarkFlagDirname("out")
 	cmd.Args = cobra.NoArgs
-	cmd.Example = `  # Basic usage
+	cmd.Example = `  # Basic usage (interactive agent selection)
   falcon init --repo .
 
-  # Custom output paths
-  falcon init --repo /path/to/project --out /path/to/project/.falcon/artifacts --context-out /path/to/project/AGENTS.md`
+  # Non-interactive: specify agents
+  falcon init --repo . --agents claude,roo,cline
+
+  # Skip agent setup entirely
+  falcon init --repo . --agents none`
 
 	return cmd
+}
+
+// resolveAgents determines which agents to configure.
+func resolveAgents(flagVal string, lg *slog.Logger) []agentsetup.AgentID {
+	flagVal = strings.TrimSpace(flagVal)
+
+	// Explicit "none" skips setup.
+	if strings.EqualFold(flagVal, "none") {
+		return nil
+	}
+
+	// If --agents flag was provided, parse it.
+	if flagVal != "" {
+		ids := agentsetup.ParseAgentIDs(flagVal)
+		if len(ids) > 0 {
+			return ids
+		}
+		lg.Warn("no valid agents in --agents flag", "value", flagVal)
+		return nil
+	}
+
+	// Interactive mode: prompt the user.
+	if agentsetup.IsInteractive() {
+		ids, err := agentsetup.PromptAgentSelection(os.Stderr, os.Stdin)
+		if err != nil {
+			lg.Warn("agent selection prompt failed", "err", err)
+			return nil
+		}
+		return ids
+	}
+
+	// Non-interactive without --agents: skip.
+	lg.Info("non-interactive mode: use --agents flag to configure coding agents")
+	return nil
+}
+
+// resolveExe returns the absolute path to the current falcon binary.
+func resolveExe() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(exe)
+}
+
+// configureAgent dispatches to the appropriate agent configurator.
+func configureAgent(id agentsetup.AgentID, repoRoot, falconBin string, lg *slog.Logger) error {
+	switch id {
+	case agentsetup.AgentClaude:
+		lg.Info("configuring Claude Code", "repo", repoRoot)
+		if err := agentsetup.ConfigureClaude(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("claude setup: %w", err)
+		}
+		lg.Info("  created/updated CLAUDE.md and .claude/settings.json")
+	case agentsetup.AgentRoo:
+		lg.Info("configuring Roo Code", "repo", repoRoot)
+		if err := agentsetup.ConfigureRoo(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("roo setup: %w", err)
+		}
+		lg.Info("  created .roo/rules/falcon.md and .roo/mcp.json")
+	case agentsetup.AgentCline:
+		lg.Info("configuring Cline", "repo", repoRoot)
+		if err := agentsetup.ConfigureCline(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("cline setup: %w", err)
+		}
+		lg.Info("  created/updated .clinerules and .cline/mcp_settings.json")
+	default:
+		return fmt.Errorf("unknown agent: %s", id)
+	}
+	return nil
 }
