@@ -4,16 +4,19 @@ package agentsetup
 // It tells the agent how and when to use the falcon MCP tools.
 const falconInstructions = `## RepoFalcon Code Knowledge Graph
 
-This repository has a code knowledge graph available via MCP tools (` + "`falcon_*`" + `).
+This repository has a pre-built code knowledge graph. You MUST use the ` + "`falcon_*`" + ` MCP tools to understand the codebase before making changes.
 
-**When to use:**
-- Before modifying a file, call ` + "`falcon_file_context`" + ` to see its dependencies and dependents
-- Before refactoring, call ` + "`falcon_architecture`" + ` for package boundaries and dependency direction
-- To find all usages of a symbol, use ` + "`falcon_symbol_lookup`" + ` instead of grep
-- To search structurally, use ` + "`falcon_search`" + ` for packages, files, or symbols by name
-- After major refactoring (renamed packages, moved files), call ` + "`falcon_refresh`" + ` to re-index
+**Mandatory workflow:**
+1. At the start of every task, call ` + "`falcon_architecture`" + ` to understand the project structure
+2. Before modifying any file, call ` + "`falcon_file_context`" + ` with its path to see what depends on it
+3. Before renaming or refactoring a symbol, call ` + "`falcon_symbol_lookup`" + ` to find all usages
+4. To understand a package's role, call ` + "`falcon_package_info`" + ` instead of reading files one by one
+5. Use ` + "`falcon_search`" + ` instead of grep/glob for finding symbols, files, or packages by name
+6. After major refactoring (renamed packages, moved files), call ` + "`falcon_refresh`" + ` to re-index
 
-**Static context:** See ` + "`.falcon/CONTEXT.md`" + ` for a full architecture summary.`
+These tools are faster and more accurate than grep — they use a pre-computed dependency graph with full symbol resolution.
+
+**Static context:** See ` + "`.falcon/CONTEXT.md`" + ` for a full architecture summary you should read at the start of a session.`
 
 // mcpServerConfig returns a JSON-compatible map for the falcon MCP server entry.
 func mcpServerConfig(falconBin, snapshotDir string) map[string]any {
