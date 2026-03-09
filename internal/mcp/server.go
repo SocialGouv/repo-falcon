@@ -38,18 +38,27 @@ type RPCError struct {
 
 // Server is a minimal MCP server over stdio.
 type Server struct {
-	graph   *GraphIndex
-	tools   []ToolDef
-	handler func(name string, args map[string]any, g *GraphIndex) (string, error)
+	graph       *GraphIndex
+	tools       []ToolDef
+	handler     func(name string, args map[string]any, s *Server) (string, error)
+	RepoRoot    string // repo root for re-indexing
+	SnapshotDir string // snapshot dir for re-indexing and reloading
 }
 
 // NewServer creates a new MCP server backed by the given graph index.
-func NewServer(g *GraphIndex) *Server {
+func NewServer(g *GraphIndex, repoRoot, snapshotDir string) *Server {
 	return &Server{
-		graph:   g,
-		tools:   AllTools(),
-		handler: HandleToolCall,
+		graph:       g,
+		tools:       AllTools(),
+		handler:     HandleToolCall,
+		RepoRoot:    repoRoot,
+		SnapshotDir: snapshotDir,
 	}
+}
+
+// ReloadGraph reloads the graph from the snapshot directory.
+func (s *Server) ReloadGraph(g *GraphIndex) {
+	s.graph = g
 }
 
 // Serve reads JSON-RPC requests from r and writes responses to w.
@@ -140,7 +149,7 @@ func (s *Server) handleRequest(req JSONRPCRequest) *JSONRPCResponse {
 			}
 		}
 
-		text, err := s.handler(params.Name, params.Arguments, s.graph)
+		text, err := s.handler(params.Name, params.Arguments, s)
 		if err != nil {
 			return &JSONRPCResponse{
 				JSONRPC: "2.0",

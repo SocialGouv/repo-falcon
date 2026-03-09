@@ -83,5 +83,13 @@ func AllTools() []ToolDef {
 				"required": []string{"query"},
 			},
 		},
+		{
+			Name:        "falcon_refresh",
+			Description: "Re-index the repository and reload the code knowledge graph. Call this after major refactoring (renamed packages, moved files, changed dependency structure). Not needed for small edits.",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
 	}
 }
