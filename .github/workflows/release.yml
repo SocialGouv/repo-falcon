@@ -43,7 +43,7 @@ jobs:
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           OUTPUT="falcon-${GOOS}-${GOARCH}${EXT}"
-          go build \
+          go build -mod=vendor \
             -ldflags "-s -w -X repofalcon/internal/appinfo.Version=${VERSION} -X repofalcon/internal/appinfo.Commit=${COMMIT}" \
             -o "${OUTPUT}" ./cmd/falcon
           sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"

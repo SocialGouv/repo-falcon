@@ -31,10 +31,10 @@ jobs:
           fi
 
       - name: go vet
-        run: go vet ./...
+        run: go vet -mod=vendor ./...
 
       - name: go test
-        run: go test ./...
+        run: go test -mod=vendor ./...
 
       - name: Smoke test (CLI)
         shell: bash
@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           out=/tmp/repofalcon-artifacts
           rm -rf "${out}"
-          go run ./cmd/falcon index --repo testdata/tinyrepo_go_js --out "${out}"
-          go run ./cmd/falcon snapshot --in "${out}" --out "${out}"
+          go run -mod=vendor ./cmd/falcon index --repo testdata/tinyrepo_go_js --out "${out}"
+          go run -mod=vendor ./cmd/falcon snapshot --in "${out}" --out "${out}"
           test -f "${out}/metadata.json"
 

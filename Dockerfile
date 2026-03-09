@@ -3,15 +3,12 @@ FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache git
 
 WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-
 COPY . .
 
 ARG VERSION=dev
 ARG COMMIT=
 
-RUN go build \
+RUN go build -mod=vendor \
     -ldflags "-s -w -X repofalcon/internal/appinfo.Version=${VERSION} -X repofalcon/internal/appinfo.Commit=${COMMIT}" \
     -o /falcon ./cmd/falcon
 
