@@ -5,6 +5,6 @@
   "packageManager": "pnpm@10.24.0",
   "devDependencies": {
     "@release-it/conventional-changelog": "^10",
-    "release-it": "^18"
+    "release-it": "^19"
   }
 }
