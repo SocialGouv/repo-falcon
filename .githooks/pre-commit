@@ -13,14 +13,13 @@ fi
 
 PASS=true
 
-# --- gofmt ---
+# --- gofmt (auto-fix) ---
 UNFORMATTED=$(echo "$STAGED_GO_FILES" | xargs gofmt -l 2>/dev/null || true)
 if [ -n "$UNFORMATTED" ]; then
-  echo "❌ gofmt: the following files need formatting:"
+  echo "$UNFORMATTED" | xargs gofmt -w
+  echo "$UNFORMATTED" | xargs git add
+  echo "✔ gofmt: auto-formatted and re-staged:"
   echo "$UNFORMATTED"
-  echo ""
-  echo "Run: make fmt"
-  PASS=false
 fi
 
 # --- go vet ---

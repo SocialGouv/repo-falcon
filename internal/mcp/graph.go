@@ -20,13 +20,13 @@ type GraphIndex struct {
 	Findings []artifacts.FindingRow
 
 	// Lookup maps.
-	FileByID    map[string]artifacts.FileRow
-	FileByPath  map[string]artifacts.FileRow
-	PkgByID     map[string]artifacts.PackageRow
-	PkgByName   map[string]artifacts.PackageRow
-	SymByID     map[string]artifacts.SymbolRow
-	SymsByFile  map[string][]artifacts.SymbolRow
-	SymsByName  map[string][]artifacts.SymbolRow
+	FileByID   map[string]artifacts.FileRow
+	FileByPath map[string]artifacts.FileRow
+	PkgByID    map[string]artifacts.PackageRow
+	PkgByName  map[string]artifacts.PackageRow
+	SymByID    map[string]artifacts.SymbolRow
+	SymsByFile map[string][]artifacts.SymbolRow
+	SymsByName map[string][]artifacts.SymbolRow
 
 	// Edge indexes.
 	EdgesBySrc  map[string][]artifacts.EdgeRow

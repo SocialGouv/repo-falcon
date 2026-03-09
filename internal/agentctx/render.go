@@ -77,7 +77,7 @@ func BuildSummary(ctx context.Context, snapshotDir string) (*ArchSummary, error)
 
 	// Build internal package summaries and dependency graph.
 	var internalPkgs []PackageSummary
-	depGraph := map[string][]string{}       // internal pkg → imported pkgs (internal only)
+	depGraph := map[string][]string{}        // internal pkg → imported pkgs (internal only)
 	reverseDepGraph := map[string][]string{} // internal pkg → importing pkgs (internal only)
 	extUsedBy := map[string][]string{}       // ext pkg name → internal pkg names that use it
 

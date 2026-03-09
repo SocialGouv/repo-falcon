@@ -30,12 +30,12 @@ type ArchSummary struct {
 
 // PackageSummary describes an internal package and its contents.
 type PackageSummary struct {
-	Name      string
-	Ecosystem string
-	Files     []string
-	Symbols   []SymbolBrief
-	Imports   []string   // packages this package's files import
-	ImportedBy []string  // packages whose files import this package
+	Name       string
+	Ecosystem  string
+	Files      []string
+	Symbols    []SymbolBrief
+	Imports    []string // packages this package's files import
+	ImportedBy []string // packages whose files import this package
 }
 
 // SymbolBrief is a compact symbol descriptor.
