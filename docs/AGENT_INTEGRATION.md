@@ -1,6 +1,8 @@
 # Coding Agent Integration
 
-RepoFalcon can expose its code knowledge graph to coding agents like Claude Code, Roo Code, Cline, and Cursor. This gives agents structured awareness of your repository's architecture, dependencies, and symbol relationships.
+RepoFalcon helps coding agents such as Claude Code, Roo Code, Cline, and Cursor work from repository structure instead of discovering everything file by file.
+
+It exposes a code knowledge graph that gives agents structured awareness of architecture, dependencies, and symbol relationships.
 
 Two complementary integration methods are available:
 
@@ -75,10 +77,10 @@ This makes agents proactive about querying the graph rather than falling back to
 
 ## Quick Start
 
-Build and initialize in one command:
+If you want the fastest path for Claude Code or another coding agent, build the CLI and initialize the repository:
 
 ```bash
-go build -o falcon ./cmd/falcon
+devbox run -- go build -o falcon ./cmd/falcon
 ./falcon init --repo .
 ```
 
@@ -87,6 +89,19 @@ This runs the full pipeline:
 2. **Snapshot** — materializes a deterministic snapshot as Parquet files
 3. **Agent context** — generates `.falcon/CONTEXT.md` (markdown summary)
 4. **Agent setup** — interactively asks which coding agents you use and configures them
+
+This is the same workflow highlighted in [`README.md`](README.md) because it is usually the shortest path from “I want my agent to understand this repo” to a usable setup.
+
+### Why this is useful for Claude Code
+
+When Claude Code is asked to refactor a package, rename a symbol, or review the blast radius of a change, RepoFalcon gives it precomputed context instead of forcing it to infer architecture from raw file reads alone.
+
+In practice, that means Claude Code can:
+
+- inspect dependencies before editing a file
+- understand package boundaries before adding imports
+- look up symbol relationships structurally instead of relying only on text search
+- refresh the graph after major refactors
 
 ### Interactive agent setup
 
@@ -130,7 +145,7 @@ The instruction files contain guidance on when and how to use the `falcon_*` MCP
 
 Files that support marker sections (`CLAUDE.md`, `.clinerules`) use `<!-- BEGIN FALCON -->` / `<!-- END FALCON -->` markers for idempotent updates — running `falcon init` again replaces the falcon section without touching your other content.
 
-### Example CLAUDE.md
+### Example [`CLAUDE.md`](CLAUDE.md:1)
 
 After running `falcon init --repo . --agents claude`, your `CLAUDE.md` will contain:
 
@@ -151,7 +166,7 @@ This repository has a code knowledge graph available via MCP tools (`falcon_*`).
 <!-- END FALCON -->
 ```
 
-And `.mcp.json` will contain (merged with any existing settings):
+And `.mcp.json` will contain a matching MCP server entry (merged with any existing settings):
 
 ```json
 {
