@@ -62,18 +62,20 @@ curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/f
 Invoke-WebRequest -Uri "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-windows-amd64.exe" -OutFile falcon.exe
 ```
 
-The fastest end-to-end setup is:
+**The one command to know:**
 
 ```bash
-./falcon init --repo .
+falcon sync
 ```
+
+Run it once to set up, run it again anytime to refresh. It is fully idempotent.
 
 This command:
 
 1. indexes the repository
 2. builds a deterministic snapshot
-3. generates [`.falcon/CONTEXT.md`](.falcon/)
-4. can configure coding-agent integrations
+3. generates [`.falcon/CONTEXT.md`](.falcon/CONTEXT.md)
+4. configures coding-agent integrations (interactive on first run, or pass `--agents claude,roo,cline`)
 
 If you want to run the steps manually:
 
@@ -111,15 +113,15 @@ Without RepoFalcon, an agent usually has to discover architecture by reading fil
 ### Typical workflow
 
 ```bash
-./falcon init --repo . --agents claude
+falcon sync --agents claude
 ```
 
 That setup gives you two useful layers:
 
-1. **Static context** via [`.falcon/CONTEXT.md`](.falcon/)
-2. **Live graph queries** via [`falcon mcp serve`](cmd/falcon/main.go:1)
+1. **Static context** via [`.falcon/CONTEXT.md`](.falcon/CONTEXT.md)
+2. **Live graph queries** via [`falcon mcp serve`](internal/cli/mcp.go)
 
-RepoFalcon can also update Claude Code files such as [`CLAUDE.md`](CLAUDE.md:1) and MCP configuration so the agent knows when to query repository structure instead of relying only on raw file search.
+RepoFalcon can also update Claude Code files such as [`CLAUDE.md`](CLAUDE.md) and MCP configuration so the agent knows when to query repository structure instead of relying only on raw file search.
 
 ### Concrete example
 
@@ -134,7 +136,7 @@ With RepoFalcon in place, Claude Code can:
 
 This makes refactors safer and reduces wasted context-window usage.
 
-For the full integration guide, agent-specific setup, and MCP details, see [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md:1).
+For the full integration guide, agent-specific setup, and MCP details, see [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md).
 
 ---
 
@@ -167,18 +169,18 @@ Instead of asking downstream tooling to rediscover the repository from scratch, 
 ./falcon pr-pack --repo . --snapshot artifacts --base "$BASE_SHA" --head "$HEAD_SHA" --out artifacts
 ```
 
-The key step for reproducibility is running [`snapshot`](cmd/falcon/main.go:1) after indexing. More details are available in [`docs/CI.md`](docs/CI.md:1).
+The key step for reproducibility is running [`snapshot`](internal/cli/snapshot.go) after indexing. More details are available in [`docs/CI.md`](docs/CI.md).
 
 ---
 
 ## GitHub Action usage
 
-RepoFalcon ships as a reusable composite action via [`action.yml`](action.yml:1).
+RepoFalcon ships as a reusable composite action via [`action.yml`](action.yml).
 
 Example workflows are included in this repository:
 
-- [`/.github/workflows/repofalcon_pr_context.yml`](.github/workflows/repofalcon_pr_context.yml:1)
-- [`/.github/workflows/repofalcon_then_claude_review.yml`](.github/workflows/repofalcon_then_claude_review.yml:1)
+- [`.github/workflows/repofalcon_pr_context.yml`](.github/workflows/repofalcon_pr_context.yml)
+- [`.github/workflows/repofalcon_then_claude_review.yml`](.github/workflows/repofalcon_then_claude_review.yml)
 
 ### Example: generate PR context artifacts
 
@@ -218,7 +220,7 @@ The typical pattern is:
 2. upload or pass them to a downstream AI review job
 3. let the reviewer consume structured outputs instead of rediscovering the repo
 
-See [`/.github/workflows/repofalcon_then_claude_review.yml`](.github/workflows/repofalcon_then_claude_review.yml:1) for a concrete example of this pipeline shape.
+See [`.github/workflows/repofalcon_then_claude_review.yml`](.github/workflows/repofalcon_then_claude_review.yml) for a concrete example of this pipeline shape.
 
 ---
 
@@ -239,7 +241,7 @@ RepoFalcon generates artifacts that can be consumed by humans, scripts, CI syste
 
 - `pr_context_pack.json` — structured machine-readable context for a PR
 - `review_report.md` — a human-readable review summary
-- [`.falcon/CONTEXT.md`](.falcon/) — a compact repository overview for coding agents
+- [`.falcon/CONTEXT.md`](.falcon/CONTEXT.md) — a compact repository overview for coding agents
 
 ---
 
@@ -278,9 +280,9 @@ Integration tests run the CLI twice on the same fixture repositories and compare
 
 ## Architecture and additional docs
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md:1) — internal architecture and design overview
-- [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md:1) — coding-agent setup, MCP, and static context files
-- [`docs/CI.md`](docs/CI.md:1) — deterministic CI guidance and pipeline recommendations
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — internal architecture and design overview
+- [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md) — coding-agent setup, MCP, and static context files
+- [`docs/CI.md`](docs/CI.md) — deterministic CI guidance and pipeline recommendations
 
 ---
 

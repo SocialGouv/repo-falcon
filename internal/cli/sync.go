@@ -16,14 +16,14 @@ import (
 	"repofalcon/internal/logging"
 )
 
-func newInitCmd() *cobra.Command {
+func newSyncCmd() *cobra.Command {
 	var repoRoot string
 	var out string
 	var contextOut string
 	var agents string
 
 	cmd := &cobra.Command{
-		Use:   "init",
+		Use:   "sync",
 		Short: "Index, snapshot, and generate agent context in one step",
 		Long: `Runs the full pipeline to make a repository ready for coding agents:
 
@@ -32,6 +32,7 @@ func newInitCmd() *cobra.Command {
   3. falcon agent-context — generate a markdown summary for agents
   4. agent setup          — configure your coding agents (interactive or via --agents)
 
+Fully idempotent: run once to set up, run again anytime to refresh.
 After running this command, your coding agents will have access to the
 code knowledge graph via MCP tools and static context files.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,7 +77,7 @@ code knowledge graph via MCP tools and static context files.`,
 			}
 
 			// Step 4: agent setup.
-			selectedAgents := resolveAgents(agents, lg)
+			selectedAgents := resolveAgents(agents, repoDir, lg)
 			if len(selectedAgents) > 0 {
 				lg.Info("step 4/4: configuring coding agents")
 				for _, id := range selectedAgents {
@@ -103,20 +104,23 @@ code knowledge graph via MCP tools and static context files.`,
 	_ = cmd.MarkFlagDirname("repo")
 	_ = cmd.MarkFlagDirname("out")
 	cmd.Args = cobra.NoArgs
-	cmd.Example = `  # Basic usage (interactive agent selection)
-  falcon init --repo .
+	cmd.Aliases = []string{"init"} // "init" kept for backwards compatibility
+	cmd.Example = `  # Basic usage — run from your repo root
+  falcon sync
 
   # Non-interactive: specify agents
-  falcon init --repo . --agents claude,roo,cline
+  falcon sync --agents claude,roo,cline
 
-  # Skip agent setup entirely
-  falcon init --repo . --agents none`
+  # Refresh without agent setup prompt
+  falcon sync --agents none`
 
 	return cmd
 }
 
 // resolveAgents determines which agents to configure.
-func resolveAgents(flagVal string, lg *slog.Logger) []agentsetup.AgentID {
+// If agents are already configured and no --agents flag is given, it re-uses
+// the previously configured agents silently (no interactive prompt).
+func resolveAgents(flagVal string, repoRoot string, lg *slog.Logger) []agentsetup.AgentID {
 	flagVal = strings.TrimSpace(flagVal)
 
 	// Explicit "none" skips setup.
@@ -134,7 +138,13 @@ func resolveAgents(flagVal string, lg *slog.Logger) []agentsetup.AgentID {
 		return nil
 	}
 
-	// Interactive mode: prompt the user.
+	// If agents are already configured, re-use them silently.
+	if existing := agentsetup.DetectConfiguredAgents(repoRoot); len(existing) > 0 {
+		lg.Info("re-configuring previously detected agents", "agents", existing)
+		return existing
+	}
+
+	// First run with TTY: prompt the user.
 	if agentsetup.IsInteractive() {
 		ids, err := agentsetup.PromptAgentSelection(os.Stderr, os.Stdin)
 		if err != nil {

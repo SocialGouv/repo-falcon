@@ -1,5 +1,10 @@
 package agentsetup
 
+import (
+	"os"
+	"path/filepath"
+)
+
 // AgentID identifies a supported coding agent.
 type AgentID string
 
@@ -8,6 +13,27 @@ const (
 	AgentRoo    AgentID = "roo"
 	AgentCline  AgentID = "cline"
 )
+
+// DetectConfiguredAgents returns the list of agents that already have
+// falcon MCP configuration in the given repository root.
+func DetectConfiguredAgents(repoRoot string) []AgentID {
+	markers := map[AgentID]string{
+		AgentClaude: ".mcp.json",
+		AgentRoo:    filepath.Join(".roo", "mcp.json"),
+		AgentCline:  filepath.Join(".cline", "mcp_settings.json"),
+	}
+	var found []AgentID
+	for _, a := range SupportedAgents {
+		p, ok := markers[a.ID]
+		if !ok {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(repoRoot, p)); err == nil {
+			found = append(found, a.ID)
+		}
+	}
+	return found
+}
 
 // AgentInfo describes a supported coding agent for display and selection.
 type AgentInfo struct {
