@@ -105,17 +105,21 @@ In practice, that means Claude Code can:
 
 ### Interactive agent setup
 
-When running in a terminal, `falcon init` prompts you to select your coding agents:
+When running in a terminal, `falcon init` presents an interactive multi-select:
 
 ```
-Which coding agents do you use? (select numbers, comma-separated)
+Which coding agents do you use?
+  ↑/↓ navigate · Space toggle · a all · Enter confirm
 
-  1) Claude Code
-  2) Roo Code
-  3) Cline
-
-Enter selection (e.g. 1,2 or 'all'), or press Enter to skip:
+  ▸ [✓ ] Claude Code
+    [  ] Cursor
+    [  ] Windsurf
+    [  ] GitHub Copilot
+    [✓ ] Roo Code
+    [  ] Cline
 ```
+
+Use arrow keys (or `j`/`k`) to move, `Space` to toggle, `a` to select/deselect all, and `Enter` to confirm.
 
 For each selected agent, falcon automatically:
 - Creates/updates the agent's instruction file with falcon MCP tool guidance
