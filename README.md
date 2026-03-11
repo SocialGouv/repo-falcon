@@ -47,13 +47,13 @@ RepoFalcon currently supports:
 Install the latest binary:
 
 ```bash
-curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" | sudo tee /usr/local/bin/falcon > /dev/null && sudo chmod +x /usr/local/bin/falcon
+curl -fsSL https://socialgouv.github.io/repo-falcon/install.sh | sh
 ```
 
-Or download to the current directory if you prefer not to install globally:
+Or install to a custom directory (no sudo):
 
 ```bash
-curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" -o ./falcon && chmod +x ./falcon
+INSTALL_DIR=. curl -fsSL https://socialgouv.github.io/repo-falcon/install.sh | sh
 ```
 
 **Windows** (PowerShell):
