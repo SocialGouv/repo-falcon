@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-binaries:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     env:
       CGO_ENABLED: 1
     strategy:
@@ -22,21 +22,25 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            runner: ubuntu-latest
             zig_target: x86_64-linux-musl
           - goos: linux
             goarch: arm64
+            runner: ubuntu-latest
             zig_target: aarch64-linux-musl
           - goos: darwin
             goarch: amd64
-            zig_target: x86_64-macos
+            runner: macos-latest
           - goos: darwin
             goarch: arm64
-            zig_target: aarch64-macos
+            runner: macos-latest
           - goos: windows
             goarch: amd64
+            runner: ubuntu-latest
             zig_target: x86_64-windows-gnu
           - goos: windows
             goarch: arm64
+            runner: ubuntu-latest
             zig_target: aarch64-windows-gnu
     steps:
       - uses: actions/checkout@v6
@@ -46,13 +50,14 @@ jobs:
           go-version-file: go.mod
 
       - uses: mlugg/setup-zig@v2
+        if: matrix.zig_target != ''
 
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CC: zig cc -target ${{ matrix.zig_target }}
-          CXX: zig c++ -target ${{ matrix.zig_target }}
+          CC: ${{ matrix.zig_target && format('zig cc -target {0}', matrix.zig_target) || '' }}
+          CXX: ${{ matrix.zig_target && format('zig c++ -target {0}', matrix.zig_target) || '' }}
         run: |
           VERSION="${GITHUB_REF_NAME}"
           COMMIT="$(git rev-parse --short HEAD)"
@@ -62,7 +67,11 @@ jobs:
           go build -mod=vendor \
             -ldflags "-s -w -X repofalcon/internal/appinfo.Version=${VERSION} -X repofalcon/internal/appinfo.Commit=${COMMIT}" \
             -o "${OUTPUT}" ./cmd/falcon
-          sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "${OUTPUT}" > "${OUTPUT}.sha256"
+          else
+            shasum -a 256 "${OUTPUT}" > "${OUTPUT}.sha256"
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
