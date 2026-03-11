@@ -20,6 +20,9 @@ func TestScan_IgnoreDirs(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmp, "artifacts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(tmp, ".falcon"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := os.WriteFile(filepath.Join(tmp, ".git", "x"), []byte("nope"), 0o644); err != nil {
 		t.Fatal(err)
@@ -28,6 +31,9 @@ func TestScan_IgnoreDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmp, "artifacts", "z"), []byte("nope"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".falcon", "CONTEXT.md"), []byte("nope"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

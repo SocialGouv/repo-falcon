@@ -7,11 +7,6 @@ import (
 )
 
 var (
-	// JS/TS
-	reJSImportFrom  = regexp.MustCompile(`(?m)^\s*import\b[^\n;]*\bfrom\s+['\"]([^'\"]+)['\"]`)
-	reJSImportBare  = regexp.MustCompile(`(?m)^\s*import\s+['\"]([^'\"]+)['\"]`)
-	reJSRequireCall = regexp.MustCompile(`\brequire\s*\(\s*['\"]([^'\"]+)['\"]\s*\)`)
-
 	// Python
 	rePyImport     = regexp.MustCompile(`(?m)^\s*import\s+([A-Za-z0-9_\.]+)`)
 	rePyFromImport = regexp.MustCompile(`(?m)^\s*from\s+([A-Za-z0-9_\.]+)\s+import\b`)
@@ -19,14 +14,6 @@ var (
 	// Java
 	reJavaImport = regexp.MustCompile(`(?m)^\s*import\s+(?:static\s+)?([A-Za-z0-9_\.*]+)\s*;`)
 )
-
-func ExtractJSImportTargets(src []byte) []string {
-	var out []string
-	out = append(out, findAllSubmatch1(reJSImportFrom, src)...)
-	out = append(out, findAllSubmatch1(reJSImportBare, src)...)
-	out = append(out, findAllSubmatch1(reJSRequireCall, src)...)
-	return uniqSorted(out)
-}
 
 func ExtractPythonImportTargets(src []byte) []string {
 	var out []string

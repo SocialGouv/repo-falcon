@@ -42,6 +42,7 @@ func defaultIgnoreDirs() map[string]struct{} {
 	// NOTE: base names only; applied at every level.
 	ignored := []string{
 		".git",
+		".falcon",
 		"artifacts",
 		"node_modules",
 		"dist",

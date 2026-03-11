@@ -121,10 +121,54 @@ func newIndexCmd() *cobra.Command {
 						)
 					}
 				case "js", "ts":
-					for _, imp := range extract.ExtractJSImportTargets(fr.Content) {
+					jsf, err := extract.ExtractJSFile(fr.RepoRelPath, fr.Content, fr.Language)
+					if err != nil {
+						return fmt.Errorf("extract js %s: %w", fr.RepoRelPath, err)
+					}
+
+					// Directory-based package for containment (mirrors Go package containment).
+					dirPkg := filepath.Dir(fr.RepoRelPath)
+					if dirPkg == "." {
+						dirPkg = ""
+					}
+					dirPkgID := graph.NewPackageID(fr.Language, dirPkg)
+					packageByID[dirPkgID] = packageRowFor(fr.Language, dirPkg, true)
+					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, dirPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
+
+					for _, imp := range jsf.Imports {
 						pid := graph.NewPackageID(fr.Language, imp)
-						packageByID[pid] = packageRowFor(fr.Language, imp, false)
+						packageByID[pid] = packageRowFor(fr.Language, imp, isJSInternalImport(imp))
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
+					}
+
+					for _, s := range jsf.Symbols {
+						q := s.QualifiedName
+						semKey := graph.SymbolKey(fr.Language, dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						symID := graph.NewSymbolID(fr.Language, dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						pkgIDPtr := dirPkgID
+						symbolRows = append(symbolRows, artifacts.SymbolRow{
+							SymbolID:          symID,
+							FileID:            fileID,
+							PackageID:         &pkgIDPtr,
+							Language:          fr.Language,
+							Kind:              s.Kind,
+							Name:              s.Name,
+							QualifiedName:     q,
+							Signature:         nil,
+							SemanticKey:       semKey,
+							StartLine:         int32(s.StartLine),
+							StartCol:          int32(s.StartCol),
+							EndLine:           int32(s.EndLine),
+							EndCol:            int32(s.EndCol),
+							Visibility:        nil,
+							Modifiers:         nil,
+							ContainerSymbolID: nil,
+						})
+
+						edgeRows = append(edgeRows,
+							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
+							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
+						)
 					}
 				case "python":
 					for _, imp := range extract.ExtractPythonImportTargets(fr.Content) {
@@ -234,6 +278,12 @@ func isTestPath(repoRelPath string) bool {
 		return true
 	}
 	return false
+}
+
+func isJSInternalImport(target string) bool {
+	return strings.HasPrefix(target, "./") ||
+		strings.HasPrefix(target, "../") ||
+		strings.HasPrefix(target, "~/")
 }
 
 func readGoModulePath(goModPath string) string {
