@@ -15,21 +15,29 @@ permissions:
 jobs:
   build-binaries:
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 1
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
+            zig_target: x86_64-linux-musl
           - goos: linux
             goarch: arm64
+            zig_target: aarch64-linux-musl
           - goos: darwin
             goarch: amd64
+            zig_target: x86_64-macos
           - goos: darwin
             goarch: arm64
+            zig_target: aarch64-macos
           - goos: windows
             goarch: amd64
+            zig_target: x86_64-windows-gnu
           - goos: windows
             goarch: arm64
+            zig_target: aarch64-windows-gnu
     steps:
       - uses: actions/checkout@v6
 
@@ -37,10 +45,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: mlugg/setup-zig@v2
+
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          CC: zig cc -target ${{ matrix.zig_target }}
+          CXX: zig c++ -target ${{ matrix.zig_target }}
         run: |
           VERSION="${GITHUB_REF_NAME}"
           COMMIT="$(git rev-parse --short HEAD)"
