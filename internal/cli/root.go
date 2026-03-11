@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -24,6 +23,7 @@ func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "falcon",
 		Short:         "RepoFalcon CLI",
+		Long:          "RepoFalcon — index your repository and generate a code knowledge graph for coding agents.",
 		Version:       appinfo.FullVersion(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -37,7 +37,7 @@ func NewRootCommand() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("no command specified")
+			return cmd.Help()
 		},
 	}
 

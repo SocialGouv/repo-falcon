@@ -1,4 +1,4 @@
-.PHONY: test fmt vet ci build hooks
+.PHONY: test fmt vet ci build install hooks
 
 GO ?= go
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null || echo "dev")
@@ -26,6 +26,9 @@ ci:
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o bin/falcon ./cmd/falcon
+
+install: build
+	sudo install -m 755 bin/falcon /usr/local/bin/falcon
 
 hooks:
 	git config core.hooksPath .githooks
