@@ -59,6 +59,40 @@ func newIndexCmd() *cobra.Command {
 			var edgeRows []artifacts.EdgeRow
 			packageByID := map[string]artifacts.PackageRow{}
 
+			// Pre-compute Python top-level package directories.
+			// A directory containing __init__.py is a Python package.
+			pythonPkgDirs := make(map[string]bool)
+			for _, fr := range recs {
+				if filepath.Base(fr.RepoRelPath) == "__init__.py" {
+					dir := filepath.Dir(fr.RepoRelPath)
+					topLevel := strings.SplitN(dir, "/", 2)[0]
+					pythonPkgDirs[topLevel] = true
+					// Handle src/ layout: src/myapp/__init__.py -> "myapp".
+					if strings.HasPrefix(dir, "src/") {
+						rest := strings.TrimPrefix(dir, "src/")
+						pythonPkgDirs[strings.SplitN(rest, "/", 2)[0]] = true
+					}
+				}
+			}
+
+			// Pre-parse Java files to collect package declarations (two-pass).
+			javaExtracts := make(map[string]extract.JavaFile)
+			javaRepoPkgs := make(map[string]bool)
+			for _, fr := range recs {
+				if fr.Language != "java" {
+					continue
+				}
+				jf, err := extract.ExtractJavaFile(fr.RepoRelPath, fr.Content)
+				if err != nil {
+					lg.Warn("extract java pre-pass", "file", fr.RepoRelPath, "err", err)
+					continue
+				}
+				javaExtracts[fr.RepoRelPath] = jf
+				if jf.PackageName != "" {
+					javaRepoPkgs[jf.PackageName] = true
+				}
+			}
+
 			for _, fr := range recs {
 				fileID := graph.NewFileID(fr.RepoRelPath)
 				lines := fr.Lines
@@ -171,16 +205,112 @@ func newIndexCmd() *cobra.Command {
 						)
 					}
 				case "python":
-					for _, imp := range extract.ExtractPythonImportTargets(fr.Content) {
+					pyf, err := extract.ExtractPythonFile(fr.RepoRelPath, fr.Content)
+					if err != nil {
+						return fmt.Errorf("extract python %s: %w", fr.RepoRelPath, err)
+					}
+
+					// Directory-based package for containment.
+					dirPkg := filepath.Dir(fr.RepoRelPath)
+					if dirPkg == "." {
+						dirPkg = ""
+					}
+					dirPkgID := graph.NewPackageID("python", dirPkg)
+					packageByID[dirPkgID] = packageRowFor("python", dirPkg, true)
+					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, dirPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
+
+					for _, imp := range pyf.Imports {
 						pid := graph.NewPackageID("python", imp)
-						packageByID[pid] = packageRowFor("python", imp, false)
+						packageByID[pid] = packageRowFor("python", imp, isPythonInternalImport(imp, pythonPkgDirs))
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
+
+					for _, s := range pyf.Symbols {
+						q := s.QualifiedName
+						semKey := graph.SymbolKey("python", dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						symID := graph.NewSymbolID("python", dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						pkgIDPtr := dirPkgID
+						symbolRows = append(symbolRows, artifacts.SymbolRow{
+							SymbolID:          symID,
+							FileID:            fileID,
+							PackageID:         &pkgIDPtr,
+							Language:          "python",
+							Kind:              s.Kind,
+							Name:              s.Name,
+							QualifiedName:     q,
+							Signature:         nil,
+							SemanticKey:       semKey,
+							StartLine:         int32(s.StartLine),
+							StartCol:          int32(s.StartCol),
+							EndLine:           int32(s.EndLine),
+							EndCol:            int32(s.EndCol),
+							Visibility:        nil,
+							Modifiers:         nil,
+							ContainerSymbolID: nil,
+						})
+
+						edgeRows = append(edgeRows,
+							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
+							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
+						)
+					}
 				case "java":
-					for _, imp := range extract.ExtractJavaImportTargets(fr.Content) {
+					// Use pre-parsed result if available (from two-pass).
+					jf, ok := javaExtracts[fr.RepoRelPath]
+					if !ok {
+						var jerr error
+						jf, jerr = extract.ExtractJavaFile(fr.RepoRelPath, fr.Content)
+						if jerr != nil {
+							return fmt.Errorf("extract java %s: %w", fr.RepoRelPath, jerr)
+						}
+					}
+
+					// Package from the package declaration (or directory fallback).
+					javaPkg := jf.PackageName
+					if javaPkg == "" {
+						javaPkg = filepath.Dir(fr.RepoRelPath)
+						if javaPkg == "." {
+							javaPkg = ""
+						}
+					}
+					javaPkgID := graph.NewPackageID("java", javaPkg)
+					packageByID[javaPkgID] = packageRowFor("java", javaPkg, true)
+					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, javaPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
+
+					for _, imp := range jf.Imports {
 						pid := graph.NewPackageID("java", imp)
-						packageByID[pid] = packageRowFor("java", imp, false)
+						packageByID[pid] = packageRowFor("java", imp, isJavaInternalImport(imp, javaRepoPkgs))
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
+					}
+
+					for _, s := range jf.Symbols {
+						q := s.QualifiedName
+						semKey := graph.SymbolKey("java", javaPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						symID := graph.NewSymbolID("java", javaPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
+						javaPkgIDPtr := javaPkgID
+						symbolRows = append(symbolRows, artifacts.SymbolRow{
+							SymbolID:          symID,
+							FileID:            fileID,
+							PackageID:         &javaPkgIDPtr,
+							Language:          "java",
+							Kind:              s.Kind,
+							Name:              s.Name,
+							QualifiedName:     q,
+							Signature:         nil,
+							SemanticKey:       semKey,
+							StartLine:         int32(s.StartLine),
+							StartCol:          int32(s.StartCol),
+							EndLine:           int32(s.EndLine),
+							EndCol:            int32(s.EndCol),
+							Visibility:        nil,
+							Modifiers:         nil,
+							ContainerSymbolID: nil,
+						})
+
+						edgeRows = append(edgeRows,
+							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
+							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
+						)
 					}
 				}
 			}
@@ -284,6 +414,28 @@ func isJSInternalImport(target string) bool {
 	return strings.HasPrefix(target, "./") ||
 		strings.HasPrefix(target, "../") ||
 		strings.HasPrefix(target, "~/")
+}
+
+func isPythonInternalImport(target string, pkgDirs map[string]bool) bool {
+	// Relative imports are always internal.
+	if strings.HasPrefix(target, ".") {
+		return true
+	}
+	// Absolute imports: internal if the top-level module matches a repo package dir.
+	topLevel := strings.SplitN(target, ".", 2)[0]
+	return pkgDirs[topLevel]
+}
+
+func isJavaInternalImport(target string, repoPkgs map[string]bool) bool {
+	// Try progressively shorter prefixes to match a known repo package.
+	parts := strings.Split(target, ".")
+	for i := len(parts) - 1; i >= 1; i-- {
+		candidate := strings.Join(parts[:i], ".")
+		if repoPkgs[candidate] {
+			return true
+		}
+	}
+	return false
 }
 
 func readGoModulePath(goModPath string) string {

@@ -89,8 +89,6 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid/v2 v2.2.9
 ## explicit; go 1.20
 github.com/klauspost/cpuid/v2
-# github.com/mattn/go-pointer v0.0.1
-## explicit
 # github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8
 ## explicit
 github.com/minio/asm2plan9s
@@ -107,7 +105,9 @@ github.com/pierrec/lz4/v4/internal/xxh32
 # github.com/smacker/go-tree-sitter v0.0.0-20240827094217-dd81d9e9be82
 ## explicit; go 1.20
 github.com/smacker/go-tree-sitter
+github.com/smacker/go-tree-sitter/java
 github.com/smacker/go-tree-sitter/javascript
+github.com/smacker/go-tree-sitter/python
 github.com/smacker/go-tree-sitter/typescript/tsx
 github.com/smacker/go-tree-sitter/typescript/typescript
 # github.com/spf13/cobra v1.9.1

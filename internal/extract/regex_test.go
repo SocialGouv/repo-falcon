@@ -5,27 +5,31 @@ import (
 	"testing"
 )
 
-func TestExtractPythonImportTargets(t *testing.T) {
-	src := []byte(`# comment: import no
-import os
-import a.b as c
-from x.y import z
-`)
-	got := ExtractPythonImportTargets(src)
-	want := []string{"a.b", "os", "x.y"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %#v want %#v", got, want)
+func TestUniqSorted(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"nil", nil, nil},
+		{"empty", []string{}, nil},
+		{"single", []string{"a"}, []string{"a"}},
+		{"sorted_unique", []string{"a", "b", "c"}, []string{"a", "b", "c"}},
+		{"unsorted", []string{"c", "a", "b"}, []string{"a", "b", "c"}},
+		{"duplicates", []string{"a", "b", "a", "c", "b"}, []string{"a", "b", "c"}},
 	}
-}
-
-func TestExtractJavaImportTargets(t *testing.T) {
-	src := []byte(`import java.util.List;
-import static java.lang.Math.*;
-// import nope.X;
-`)
-	got := ExtractJavaImportTargets(src)
-	want := []string{"java.lang.Math.*", "java.util.List"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %#v want %#v", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Copy input to avoid mutating test data.
+			var in []string
+			if tt.in != nil {
+				in = make([]string, len(tt.in))
+				copy(in, tt.in)
+			}
+			got := uniqSorted(in)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("uniqSorted(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
 	}
 }
