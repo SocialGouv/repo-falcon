@@ -3,6 +3,7 @@ package repo
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -53,5 +54,47 @@ func TestScan_IgnoreDirs(t *testing.T) {
 	}
 	if recs[1].RepoRelPath != "sub/b.py" {
 		t.Fatalf("expected second path sub/b.py, got %q", recs[1].RepoRelPath)
+	}
+}
+
+func TestScan_SkipsPermissionDenied(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod-based permission test not reliable on Windows")
+	}
+	if os.Getuid() == 0 {
+		t.Skip("root bypasses file permissions")
+	}
+
+	tmp := t.TempDir()
+
+	// Readable file.
+	if err := os.WriteFile(filepath.Join(tmp, "ok.go"), []byte("package ok\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Unreadable file (permission denied on read).
+	denied := filepath.Join(tmp, "secret.go")
+	if err := os.WriteFile(denied, []byte("package secret\n"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(denied, 0o644) })
+
+	// Unreadable directory (permission denied on listing).
+	deniedDir := filepath.Join(tmp, "locked")
+	if err := os.MkdirAll(deniedDir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(deniedDir, 0o755) })
+
+	recs, err := Scan(tmp, DefaultScanOptions())
+	if err != nil {
+		t.Fatalf("Scan should not fail on permission denied, got: %v", err)
+	}
+
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 record (ok.go only), got %d", len(recs))
+	}
+	if recs[0].RepoRelPath != "ok.go" {
+		t.Fatalf("expected ok.go, got %q", recs[0].RepoRelPath)
 	}
 }

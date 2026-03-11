@@ -3,8 +3,10 @@ package repo
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -58,14 +60,18 @@ func defaultIgnoreDirs() map[string]struct{} {
 
 // Scan walks a repository root and returns deterministic file records.
 // Ordering is lexicographic by RepoRelPath.
+// Files and directories that cannot be read due to permission errors are
+// silently skipped (a warning is logged).
 func Scan(repoRoot string, opts ScanOptions) ([]FileRecord, error) {
 	if repoRoot == "" {
 		repoRoot = "."
 	}
 	repoRoot = filepath.Clean(repoRoot)
 
+	lg := slog.Default()
+
 	var out []FileRecord
-	if err := walkSorted(repoRoot, "", opts, &out); err != nil {
+	if err := walkSorted(repoRoot, "", opts, &out, lg); err != nil {
 		return nil, err
 	}
 
@@ -73,10 +79,14 @@ func Scan(repoRoot string, opts ScanOptions) ([]FileRecord, error) {
 	return out, nil
 }
 
-func walkSorted(repoRoot, rel string, opts ScanOptions, out *[]FileRecord) error {
+func walkSorted(repoRoot, rel string, opts ScanOptions, out *[]FileRecord, lg *slog.Logger) error {
 	ab := filepath.Join(repoRoot, rel)
 	entries, err := os.ReadDir(ab)
 	if err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			lg.Warn("skipping directory (permission denied)", "path", ab)
+			return nil
+		}
 		return err
 	}
 	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
@@ -93,7 +103,7 @@ func walkSorted(repoRoot, rel string, opts ScanOptions, out *[]FileRecord) error
 			if _, ok := opts.IgnoreDirNames[name]; ok {
 				continue
 			}
-			if err := walkSorted(repoRoot, relChild, opts, out); err != nil {
+			if err := walkSorted(repoRoot, relChild, opts, out, lg); err != nil {
 				return err
 			}
 			continue
@@ -101,6 +111,10 @@ func walkSorted(repoRoot, rel string, opts ScanOptions, out *[]FileRecord) error
 
 		info, err := e.Info()
 		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				lg.Warn("skipping file (permission denied)", "path", filepath.Join(repoRoot, relChild))
+				continue
+			}
 			return err
 		}
 		if !info.Mode().IsRegular() {
@@ -110,6 +124,10 @@ func walkSorted(repoRoot, rel string, opts ScanOptions, out *[]FileRecord) error
 		absPath := filepath.Join(repoRoot, relChild)
 		b, err := os.ReadFile(absPath)
 		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				lg.Warn("skipping file (permission denied)", "path", absPath)
+				continue
+			}
 			return fmt.Errorf("read %s: %w", absPath, err)
 		}
 
