@@ -44,16 +44,16 @@ RepoFalcon currently supports:
 
 ## Quickstart
 
-Download the latest binary for your platform:
-
-```bash
-curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" -o ./falcon && chmod +x ./falcon
-```
-
-Or install it globally:
+Install the latest binary:
 
 ```bash
 curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" | sudo tee /usr/local/bin/falcon > /dev/null && sudo chmod +x /usr/local/bin/falcon
+```
+
+Or download to the current directory if you prefer not to install globally:
+
+```bash
+curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" -o ./falcon && chmod +x ./falcon
 ```
 
 **Windows** (PowerShell):
@@ -61,6 +61,8 @@ curl -fsSL "https://github.com/SocialGouv/repo-falcon/releases/latest/download/f
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/SocialGouv/repo-falcon/releases/latest/download/falcon-windows-amd64.exe" -OutFile falcon.exe
 ```
+
+You can also download binaries manually from the [latest release page](https://github.com/SocialGouv/repo-falcon/releases/latest).
 
 **The one command to know:**
 
@@ -80,9 +82,9 @@ This command:
 If you want to run the steps manually:
 
 ```bash
-./falcon index --repo . --out .falcon/artifacts
-./falcon snapshot --in .falcon/artifacts --out .falcon/artifacts
-./falcon pr-pack --repo . --snapshot .falcon/artifacts --base <base-sha-or-ref> --head <head-sha-or-ref> --out .falcon/artifacts
+falcon index --repo . --out .falcon/artifacts
+falcon snapshot --in .falcon/artifacts --out .falcon/artifacts
+falcon pr-pack --repo . --snapshot .falcon/artifacts --base <base-sha-or-ref> --head <head-sha-or-ref> --out .falcon/artifacts
 ```
 
 Typical generated outputs:
@@ -164,9 +166,9 @@ Instead of asking downstream tooling to rediscover the repository from scratch, 
 ### Manual CI commands
 
 ```bash
-./falcon index --repo . --out artifacts
-./falcon snapshot --in artifacts --out artifacts
-./falcon pr-pack --repo . --snapshot artifacts --base "$BASE_SHA" --head "$HEAD_SHA" --out artifacts
+falcon index --repo . --out artifacts
+falcon snapshot --in artifacts --out artifacts
+falcon pr-pack --repo . --snapshot artifacts --base "$BASE_SHA" --head "$HEAD_SHA" --out artifacts
 ```
 
 The key step for reproducibility is running [`snapshot`](internal/cli/snapshot.go) after indexing. More details are available in [`docs/CI.md`](docs/CI.md).

@@ -81,7 +81,7 @@ If you want the fastest path for Claude Code or another coding agent, build the 
 
 ```bash
 devbox run -- go build -o falcon ./cmd/falcon
-./falcon init --repo .
+falcon init --repo .
 ```
 
 This runs the full pipeline:
@@ -127,10 +127,10 @@ Use the `--agents` flag to skip the prompt:
 
 ```bash
 # Configure specific agents
-./falcon init --repo . --agents claude,roo,cline
+falcon init --repo . --agents claude,roo,cline
 
 # Skip agent setup entirely
-./falcon init --repo . --agents none
+falcon init --repo . --agents none
 ```
 
 ### What gets created
@@ -186,7 +186,7 @@ And `.mcp.json` will contain a matching MCP server entry (merged with any existi
 Generate a markdown summary of the code knowledge graph:
 
 ```bash
-./falcon agent-context --snapshot .falcon/artifacts --out .falcon/CONTEXT.md
+falcon agent-context --snapshot .falcon/artifacts --out .falcon/CONTEXT.md
 ```
 
 Options:
@@ -214,7 +214,7 @@ Regenerate the context file whenever the codebase changes significantly:
 
 ```bash
 #!/bin/sh
-./falcon init --repo .
+falcon init --repo .
 git add .falcon/CONTEXT.md
 ```
 
@@ -225,7 +225,7 @@ git add .falcon/CONTEXT.md
 Start an MCP server that agents can query dynamically:
 
 ```bash
-./falcon mcp serve --snapshot .falcon/artifacts
+falcon mcp serve --snapshot .falcon/artifacts
 ```
 
 The server loads graph artifacts at startup and serves over stdio using the Model Context Protocol (JSON-RPC 2.0).
@@ -320,7 +320,7 @@ For repository architecture details, see .falcon/CONTEXT.md
 
 ```bash
 mkdir -p .cursor/rules
-./falcon agent-context --snapshot .falcon/artifacts --out .cursor/rules/architecture.mdc
+falcon agent-context --snapshot .falcon/artifacts --out .cursor/rules/architecture.mdc
 ```
 
 ### Generic / Other Agents
@@ -335,7 +335,7 @@ Any agent that reads markdown files can use the static context output. Any MCP-c
 
 ```yaml
 - name: Generate agent context
-  run: ./falcon init --repo .
+  run: falcon init --repo .
 
 - name: Upload context
   uses: actions/upload-artifact@v4
@@ -349,7 +349,7 @@ Any agent that reads markdown files can use the static context output. Any MCP-c
 ```yaml
 - name: Update agent context
   run: |
-    ./falcon init --repo .
+    falcon init --repo .
     git add .falcon/CONTEXT.md
     git diff --cached --quiet || git commit -m "chore: update code knowledge graph context"
 ```
