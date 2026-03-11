@@ -11,6 +11,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,16 +39,27 @@ jobs:
       - name: go vet
         run: go vet -mod=vendor ./...
 
-      - name: go test
-        run: go test -mod=vendor ./...
+      - name: Unit tests
+        run: go test -mod=vendor ./internal/...
+
+      - name: Integration & E2E tests
+        run: go test -mod=vendor -v ./integration/...
 
       - name: Smoke test (CLI)
         shell: bash
         run: |
           set -euo pipefail
-          out=/tmp/repofalcon-artifacts
-          rm -rf "${out}"
-          go run -mod=vendor ./cmd/falcon index --repo testdata/tinyrepo_go_js --out "${out}"
-          go run -mod=vendor ./cmd/falcon snapshot --in "${out}" --out "${out}"
-          test -f "${out}/metadata.json"
+          go build -mod=vendor -o /tmp/falcon ./cmd/falcon
+
+          for fixture in testdata/tinyrepo_go_js testdata/tinyrepo_go_py testdata/tinyrepo_go_java; do
+            echo "=== Smoke test: ${fixture} ==="
+            out="/tmp/repofalcon-$(basename ${fixture})"
+            rm -rf "${out}"
+            /tmp/falcon index --repo "${fixture}" --out "${out}"
+            /tmp/falcon snapshot --in "${out}" --out "${out}"
+            test -f "${out}/metadata.json"
+            test -f "${out}/packages.parquet"
+            test -f "${out}/symbols.parquet"
+            echo "✓ ${fixture} passed"
+          done
 
