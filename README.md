@@ -75,7 +75,7 @@ This command:
 1. indexes the repository
 2. builds a deterministic snapshot
 3. generates [`.falcon/CONTEXT.md`](.falcon/CONTEXT.md)
-4. configures coding-agent integrations (interactive on first run, or pass `--agents claude,roo,cline`)
+4. configures coding-agent integrations (interactive on first run, or pass `--agents claude,cursor,windsurf,copilot,roo,cline`)
 
 If you want to run the steps manually:
 

@@ -9,18 +9,24 @@ import (
 type AgentID string
 
 const (
-	AgentClaude AgentID = "claude"
-	AgentRoo    AgentID = "roo"
-	AgentCline  AgentID = "cline"
+	AgentClaude   AgentID = "claude"
+	AgentCursor   AgentID = "cursor"
+	AgentWindsurf AgentID = "windsurf"
+	AgentCopilot  AgentID = "copilot"
+	AgentRoo      AgentID = "roo"
+	AgentCline    AgentID = "cline"
 )
 
 // DetectConfiguredAgents returns the list of agents that already have
 // falcon MCP configuration in the given repository root.
 func DetectConfiguredAgents(repoRoot string) []AgentID {
 	markers := map[AgentID]string{
-		AgentClaude: ".mcp.json",
-		AgentRoo:    filepath.Join(".roo", "mcp.json"),
-		AgentCline:  filepath.Join(".cline", "mcp_settings.json"),
+		AgentClaude:   ".mcp.json",
+		AgentCursor:   filepath.Join(".cursor", "mcp.json"),
+		AgentWindsurf: filepath.Join(".windsurf", "mcp.json"),
+		AgentCopilot:  filepath.Join(".vscode", "mcp.json"),
+		AgentRoo:      filepath.Join(".roo", "mcp.json"),
+		AgentCline:    filepath.Join(".cline", "mcp_settings.json"),
 	}
 	var found []AgentID
 	for _, a := range SupportedAgents {
@@ -44,6 +50,9 @@ type AgentInfo struct {
 // SupportedAgents lists all coding agents that falcon can auto-configure.
 var SupportedAgents = []AgentInfo{
 	{ID: AgentClaude, Label: "Claude Code"},
+	{ID: AgentCursor, Label: "Cursor"},
+	{ID: AgentWindsurf, Label: "Windsurf"},
+	{ID: AgentCopilot, Label: "GitHub Copilot"},
 	{ID: AgentRoo, Label: "Roo Code"},
 	{ID: AgentCline, Label: "Cline"},
 }

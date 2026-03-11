@@ -100,7 +100,7 @@ code knowledge graph via MCP tools and static context files.`,
 	cmd.Flags().StringVar(&repoRoot, "repo", ".", "path to repository root")
 	cmd.Flags().StringVar(&out, "out", ".falcon/artifacts", "output directory for artifacts")
 	cmd.Flags().StringVar(&contextOut, "context-out", "", "output path for context file (default: <repo>/.falcon/CONTEXT.md)")
-	cmd.Flags().StringVar(&agents, "agents", "", "comma-separated list of agents to configure: claude,roo,cline (interactive prompt if omitted)")
+	cmd.Flags().StringVar(&agents, "agents", "", "comma-separated list of agents to configure: claude,cursor,windsurf,copilot,roo,cline (interactive prompt if omitted)")
 	_ = cmd.MarkFlagDirname("repo")
 	_ = cmd.MarkFlagDirname("out")
 	cmd.Args = cobra.NoArgs
@@ -168,6 +168,24 @@ func configureAgent(id agentsetup.AgentID, repoRoot, falconBin string, lg *slog.
 			return fmt.Errorf("claude setup: %w", err)
 		}
 		lg.Info("  created/updated CLAUDE.md and .mcp.json")
+	case agentsetup.AgentCursor:
+		lg.Info("configuring Cursor", "repo", repoRoot)
+		if err := agentsetup.ConfigureCursor(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("cursor setup: %w", err)
+		}
+		lg.Info("  created/updated .cursor/rules/falcon.mdc and .cursor/mcp.json")
+	case agentsetup.AgentWindsurf:
+		lg.Info("configuring Windsurf", "repo", repoRoot)
+		if err := agentsetup.ConfigureWindsurf(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("windsurf setup: %w", err)
+		}
+		lg.Info("  created/updated .windsurfrules and .windsurf/mcp.json")
+	case agentsetup.AgentCopilot:
+		lg.Info("configuring GitHub Copilot", "repo", repoRoot)
+		if err := agentsetup.ConfigureCopilot(repoRoot, falconBin); err != nil {
+			return fmt.Errorf("copilot setup: %w", err)
+		}
+		lg.Info("  created/updated .github/copilot-instructions.md and .vscode/mcp.json")
 	case agentsetup.AgentRoo:
 		lg.Info("configuring Roo Code", "repo", repoRoot)
 		if err := agentsetup.ConfigureRoo(repoRoot, falconBin); err != nil {
