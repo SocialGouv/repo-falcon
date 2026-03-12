@@ -64,6 +64,21 @@ Invoke-WebRequest -Uri "https://github.com/SocialGouv/repo-falcon/releases/lates
 
 You can also download binaries manually from the [latest release page](https://github.com/SocialGouv/repo-falcon/releases/latest).
 
+### Uninstall
+
+Remove the binary and any generated project artifacts:
+
+```bash
+# Remove the binary (default location; adjust if you used a custom INSTALL_DIR)
+sudo rm /usr/local/bin/falcon
+
+# Remove generated artifacts from your projects
+rm -rf .falcon/
+
+# Remove fleet configuration (if you used fleet features)
+rm -rf ~/.falcon/
+```
+
 **The one command to know:**
 
 ```bash
