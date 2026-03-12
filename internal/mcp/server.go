@@ -56,6 +56,15 @@ func NewServer(g *GraphIndex, repoRoot, snapshotDir string) *Server {
 	}
 }
 
+// NewCustomServer creates an MCP server with custom tools and handler,
+// without requiring a GraphIndex. Used by the fleet server.
+func NewCustomServer(tools []ToolDef, handler func(name string, args map[string]any, s *Server) (string, error)) *Server {
+	return &Server{
+		tools:   tools,
+		handler: handler,
+	}
+}
+
 // ReloadGraph reloads the graph from the snapshot directory.
 func (s *Server) ReloadGraph(g *GraphIndex) {
 	s.graph = g

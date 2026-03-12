@@ -5,13 +5,25 @@ overview of the repository's code graph for use by coding agents.
 
 ## Overview
 
-- Total files: 5
-- Languages: python (2), go (1)
-- Internal packages: 1
+- Total files: 7
+- Languages: python (5), go (1)
+- Internal packages: 6
 - External dependencies: 5
-- Total symbols: 3 (func: 1, method: 1, type: 1)
+- Total symbols: 8 (func: 4, class: 2, method: 1, type: 1)
 
 ## Package Map
+
+### ..py.models
+
+- **Imported by**: py
+
+### .user
+
+- **Imported by**: py/models
+
+### .util
+
+- **Imported by**: py
 
 ### main
 
@@ -19,11 +31,30 @@ overview of the repository's code graph for use by coding agents.
 - **Symbols**: `Server` (type), `URL` (method), `main` (func)
 - **Imports**: fmt, net/http
 
+### py
+
+- **Files**: __init__.py, app.py, util.py
+- **Symbols**: `handler` (func), `AppConfig` (class), `double` (func)
+- **Imports**: ..py.models, .util, json, math
+
+### py/models
+
+- **Files**: __init__.py, user.py
+- **Symbols**: `User` (class), `create_user` (func)
+- **Imports**: .user, dataclasses
+
+## Internal Dependency Graph
+
+```
+py -> ..py.models, .util
+py/models -> .user
+```
+
 ## External Dependencies
 
-- `.util` [python]
+- `dataclasses` [python] (used by: py/models)
 - `fmt` [go] (used by: main)
-- `json` [python]
-- `math` [python]
+- `json` [python] (used by: py)
+- `math` [python] (used by: py)
 - `net/http` [go] (used by: main)
 

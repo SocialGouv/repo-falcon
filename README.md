@@ -280,6 +280,73 @@ Integration tests run the CLI twice on the same fixture repositories and compare
 
 ---
 
+## Use case: multi-repository search (fleet)
+
+When you manage multiple repositories, RepoFalcon can index them all and provide cross-repo search and analysis.
+
+### Setup
+
+Create a fleet manifest listing your repos:
+
+```bash
+mkdir -p ~/.falcon
+cat > ~/.falcon/fleet.json << 'EOF'
+{
+  "version": "1",
+  "repos": [
+    {"path": "/home/user/apps/web-app", "name": "web-app"},
+    {"path": "/home/user/apps/api-server"},
+    {"path": "/home/user/apps/mobile-app"}
+  ]
+}
+EOF
+```
+
+Index all repos at once:
+
+```bash
+falcon fleet sync
+```
+
+### Cross-repo MCP server
+
+Start an MCP server that gives coding agents cross-repo awareness:
+
+```bash
+falcon fleet mcp serve
+```
+
+This exposes fleet-specific tools: `fleet_overview`, `fleet_search`, `fleet_find_repos_by_dependency`, `fleet_symbol_lookup`, `fleet_common_dependencies`, `fleet_repo_architecture`, and `fleet_file_context`.
+
+### Ad-hoc SQL queries via DuckDB
+
+Run SQL directly against all indexed repos (requires the `duckdb` CLI):
+
+```bash
+# Find which apps implemented magic link auth with Next.js
+falcon fleet query "
+  SELECT DISTINCT p._repo
+  FROM all_packages p
+  JOIN all_packages m ON p._repo = m._repo
+  WHERE p.name = 'next' AND m.name = 'magic-sdk'
+"
+
+# Find the loginWithMagicLink call sites
+falcon fleet query "SELECT _repo, qualified_name, kind FROM all_symbols WHERE qualified_name ILIKE '%loginWithMagicLink%'"
+
+# Compare tech stacks across repos
+falcon fleet query "SELECT _repo, name FROM all_packages WHERE is_internal = false ORDER BY _repo, name"
+```
+
+The `--repos` flag can override the manifest for one-off searches:
+
+```bash
+falcon fleet sync --repos ~/apps/web,~/apps/api
+falcon fleet query --repos ~/apps/web,~/apps/api "SELECT _repo, name FROM all_packages WHERE name = 'magic-sdk'"
+```
+
+---
+
 ## Architecture and additional docs
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — internal architecture and design overview

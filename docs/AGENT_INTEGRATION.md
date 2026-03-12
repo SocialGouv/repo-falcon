@@ -333,6 +333,76 @@ Any agent that reads markdown files can use the static context output. Any MCP-c
 
 ---
 
+## Fleet: Cross-Repository MCP Server
+
+When you manage multiple repositories, the fleet MCP server gives agents cross-repo awareness.
+
+### Setup
+
+1. Create `~/.falcon/fleet.json`:
+
+```json
+{
+  "version": "1",
+  "repos": [
+    {"path": "/home/user/apps/web-app", "name": "web-app"},
+    {"path": "/home/user/apps/api-server"},
+    {"path": "/home/user/apps/mobile-app"}
+  ]
+}
+```
+
+2. Index all repos: `falcon fleet sync`
+3. Start the fleet MCP server: `falcon fleet mcp serve`
+
+### Fleet MCP Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `fleet_overview` | Summary of all repos: files, languages, symbols | none |
+| `fleet_search` | Search files, symbols, or packages across all repos | `query` (required), `scope` (optional), `repo` (optional) |
+| `fleet_repo_architecture` | Architecture overview for a specific repo | `repo` (required) |
+| `fleet_file_context` | File context scoped to a repo | `repo` (required), `path` (required) |
+| `fleet_symbol_lookup` | Symbol lookup across all or one repo | `name` (required), `kind` (optional), `repo` (optional) |
+| `fleet_find_repos_by_dependency` | Find repos using a package | `dependency` (required) |
+| `fleet_common_dependencies` | Shared dependencies across fleet | none |
+
+### Agent Configuration for Fleet
+
+For Claude Code, configure the fleet MCP server in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "falcon-fleet": {
+      "command": "/path/to/falcon",
+      "args": ["fleet", "mcp", "serve", "--manifest", "/home/user/.falcon/fleet.json"]
+    }
+  }
+}
+```
+
+### DuckDB Ad-Hoc Queries
+
+For advanced cross-repo queries, use `falcon fleet query` with SQL (requires `duckdb` CLI):
+
+```bash
+# Find apps that use magic-sdk with Next.js
+falcon fleet query "
+  SELECT DISTINCT p._repo
+  FROM all_packages p
+  JOIN all_packages m ON p._repo = m._repo
+  WHERE p.name = 'next' AND m.name = 'magic-sdk'
+"
+
+# Find loginWithMagicLink call sites across all repos
+falcon fleet query "SELECT _repo, qualified_name FROM all_symbols WHERE qualified_name ILIKE '%loginWithMagicLink%'"
+```
+
+Available union views: `all_files`, `all_packages`, `all_symbols`, `all_edges`, `all_findings`. Each row includes a `_repo` column for provenance.
+
+---
+
 ## CI Integration
 
 ### Generate context in CI

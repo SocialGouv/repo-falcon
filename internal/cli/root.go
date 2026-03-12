@@ -49,6 +49,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newPRPackCmd())
 	cmd.AddCommand(newAgentContextCmd())
 	cmd.AddCommand(newMCPCmd())
+	cmd.AddCommand(newFleetCmd())
 
 	// Cobra's default help/usage outputs include timestamps only if we log them; we don't.
 	cmd.SetContext(context.Background())

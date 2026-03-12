@@ -37,6 +37,15 @@ artifacts/
   * Loads Parquet artifacts (from `index`/`snapshot`) into DuckDB.
   * Computes impact set via SQL over `edges.parquet`.
   * Writes `artifacts/pr_context_pack.json` and `artifacts/review_report.md`.
+* `falcon fleet sync`
+  * Indexes all repositories listed in `~/.falcon/fleet.json` (or `--repos` flag).
+  * Runs `falcon sync --agents none` on each repo sequentially.
+* `falcon fleet mcp serve`
+  * Loads all fleet repo graphs into memory and serves cross-repo MCP tools over stdio.
+  * Tools: `fleet_overview`, `fleet_search`, `fleet_find_repos_by_dependency`, `fleet_symbol_lookup`, `fleet_common_dependencies`, `fleet_repo_architecture`, `fleet_file_context`.
+* `falcon fleet query <sql>`
+  * Runs ad-hoc SQL across all fleet Parquet files via the DuckDB CLI.
+  * Auto-creates per-repo views and union views (`all_files`, `all_packages`, `all_symbols`, `all_edges`, `all_findings`).
 
 ### Pipeline Overview
 
@@ -111,6 +120,7 @@ Single Go module at repo root.
 * `internal/graph/*`: canonical graph types, normalization rules, deterministic ID generation, graph validation.
 * `internal/artifact/*`: artifact path conventions, Parquet schemas, metadata handling.
 * `internal/impact/*`: DuckDB integration and SQL query strings.
+* `internal/fleet/*`: multi-repository fleet management, cross-repo graph queries, fleet MCP server, DuckDB ad-hoc queries.
 * `internal/vcs/git`: computing repo-relative paths and base/head diffs.
 * `pkg/falconapi`: (optional) stable library surface for embedding RepoFalcon in other tools.
 
