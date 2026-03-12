@@ -124,13 +124,20 @@ jobs:
             Formula/falcon.rb > falcon.rb
 
       - name: Push to Homebrew tap
-        uses: dmnemec/copy_file_to_another_repo_action@main
         env:
-          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        with:
-          source_file: falcon.rb
-          destination_repo: SocialGouv/homebrew-repo-falcon
-          destination_folder: Formula
-          user_email: github-actions[bot]@users.noreply.github.com
-          user_name: github-actions[bot]
-          commit_message: "Update falcon to ${{ github.ref_name }}"
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/SocialGouv/homebrew-repo-falcon.git" tap || {
+            mkdir tap && cd tap && git init
+            git remote add origin "https://x-access-token:${TAP_TOKEN}@github.com/SocialGouv/homebrew-repo-falcon.git"
+          }
+          cd tap
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          # Handle empty repo (no commits yet)
+          git rev-parse HEAD >/dev/null 2>&1 || git commit --allow-empty -m "Init tap"
+          mkdir -p Formula
+          cp ../falcon.rb Formula/falcon.rb
+          git add Formula/falcon.rb
+          git commit -m "Update falcon to ${{ github.ref_name }}"
+          git push -u origin HEAD:main
