@@ -44,7 +44,13 @@ RepoFalcon currently supports:
 
 ## Quickstart
 
-Install the latest binary:
+**Homebrew** (macOS / Linux):
+
+```bash
+brew install SocialGouv/repo-falcon/falcon
+```
+
+Or install the latest binary:
 
 ```bash
 curl -fsSL https://socialgouv.github.io/repo-falcon/install.sh | sh
