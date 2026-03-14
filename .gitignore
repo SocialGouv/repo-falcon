@@ -3,3 +3,4 @@ artifacts
 /bin
 node_modules/
 .claude/*.local.json
+.falcon/
