@@ -48,6 +48,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newSnapshotCmd())
 	cmd.AddCommand(newPRPackCmd())
 	cmd.AddCommand(newAgentContextCmd())
+	cmd.AddCommand(newAgentSetupCmd())
 	cmd.AddCommand(newMCPCmd())
 	cmd.AddCommand(newFleetCmd())
 

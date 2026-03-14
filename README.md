@@ -100,11 +100,18 @@ This command:
 3. generates [`.falcon/CONTEXT.md`](.falcon/CONTEXT.md)
 4. configures coding-agent integrations (interactive on first run, or pass `--agents claude,cursor,windsurf,copilot,roo,cline`)
 
+If you want to add or reconfigure agents without re-running the full pipeline:
+
+```bash
+falcon agent-setup --agents claude,cursor
+```
+
 If you want to run the steps manually:
 
 ```bash
 falcon index --repo . --out .falcon/artifacts
 falcon snapshot --in .falcon/artifacts --out .falcon/artifacts
+falcon agent-setup --agents claude,cursor
 falcon pr-pack --repo . --snapshot .falcon/artifacts --base <base-sha-or-ref> --head <head-sha-or-ref> --out .falcon/artifacts
 ```
 

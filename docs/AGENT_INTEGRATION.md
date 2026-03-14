@@ -137,6 +137,26 @@ falcon init --repo . --agents claude,roo,cline
 falcon init --repo . --agents none
 ```
 
+### Standalone agent setup
+
+If the repository is already indexed and you just want to add or reconfigure agents, use the dedicated command:
+
+```bash
+# Interactive: select agents with arrow keys
+falcon agent-setup
+
+# Non-interactive: specify agents directly
+falcon agent-setup --agents claude,cursor
+
+# Reconfigure a single agent
+falcon agent-setup --agents claude
+```
+
+This skips the index/snapshot/context steps and only configures agent instruction files and MCP server entries. Useful when:
+- You want to add a new agent to an already-indexed repo
+- You need to reconfigure agents after changing your falcon binary path
+- You want to set up agents in CI without re-running the full pipeline
+
 ### What gets created
 
 | Agent | Instruction file | MCP config |
@@ -249,7 +269,7 @@ The server loads graph artifacts at startup and serves over stdio using the Mode
 
 ## Agent Setup Guides
 
-> **Recommended**: Use `falcon init --repo .` for automatic setup. The manual instructions below are for reference or custom configurations.
+> **Recommended**: Use `falcon init --repo .` for full setup, or `falcon agent-setup` to configure agents without re-indexing. The manual instructions below are for reference or custom configurations.
 
 ### Claude Code
 
