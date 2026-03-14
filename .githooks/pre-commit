@@ -23,7 +23,7 @@ if [ -n "$UNFORMATTED" ]; then
 fi
 
 # --- go vet ---
-if ! go vet ./... 2>&1; then
+if ! devbox run -- go vet ./... 2>&1; then
   echo "❌ go vet: issues found"
   PASS=false
 fi
