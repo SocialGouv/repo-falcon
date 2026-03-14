@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ConfigureClaude sets up Claude Code integration for the given repository.
@@ -18,7 +19,13 @@ func ConfigureClaude(repoRoot, falconBin string) error {
 
 	// 2. Configure MCP server in .mcp.json.
 	settingsPath := filepath.Join(repoRoot, ".mcp.json")
-	return upsertClaudeSettings(settingsPath, falconBin)
+	if err := upsertClaudeSettings(settingsPath, falconBin); err != nil {
+		return err
+	}
+
+	// 3. Configure Stop hook in .claude/settings.json.
+	hooksPath := filepath.Join(repoRoot, ".claude", "settings.json")
+	return upsertClaudeHooks(hooksPath, falconBin)
 }
 
 func upsertClaudeSettings(settingsPath, falconBin string) error {
@@ -47,4 +54,78 @@ func upsertClaudeSettings(settingsPath, falconBin string) error {
 	}
 	out = append(out, '\n')
 	return os.WriteFile(settingsPath, out, 0o644)
+}
+
+func upsertClaudeHooks(settingsPath, falconBin string) error {
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		return err
+	}
+
+	settings := make(map[string]any)
+	data, err := os.ReadFile(settingsPath)
+	if err == nil {
+		_ = json.Unmarshal(data, &settings)
+	}
+
+	hookCmd := falconBin + " sync --agents none"
+
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = make(map[string]any)
+	}
+
+	stopHooks, _ := hooks["Stop"].([]any)
+
+	if !containsFalconHook(stopHooks, hookCmd) {
+		hookEntry := map[string]any{
+			"hooks": []any{
+				map[string]any{
+					"type":    "command",
+					"command": hookCmd,
+					"async":   true,
+					"timeout": 300,
+				},
+			},
+		}
+		stopHooks = append(stopHooks, hookEntry)
+	}
+
+	hooks["Stop"] = stopHooks
+	settings["hooks"] = hooks
+
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	out = append(out, '\n')
+	return os.WriteFile(settingsPath, out, 0o644)
+}
+
+// containsFalconHook checks whether any hook group already contains a
+// falcon sync command. If found with a different binary path, it updates
+// the command in place.
+func containsFalconHook(stopHooks []any, hookCmd string) bool {
+	for _, group := range stopHooks {
+		groupMap, ok := group.(map[string]any)
+		if !ok {
+			continue
+		}
+		innerHooks, ok := groupMap["hooks"].([]any)
+		if !ok {
+			continue
+		}
+		for _, h := range innerHooks {
+			hMap, ok := h.(map[string]any)
+			if !ok {
+				continue
+			}
+			if cmd, ok := hMap["command"].(string); ok && strings.Contains(cmd, "falcon sync") {
+				hMap["command"] = hookCmd
+				hMap["async"] = true
+				hMap["timeout"] = float64(300)
+				return true
+			}
+		}
+	}
+	return false
 }

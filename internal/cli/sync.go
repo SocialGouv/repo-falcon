@@ -76,6 +76,11 @@ code knowledge graph via MCP tools and static context files.`,
 				return err
 			}
 
+			// Ensure .falcon/ is in .gitignore.
+			if err := agentsetup.EnsureGitignore(repoDir); err != nil {
+				lg.Warn("could not update .gitignore", "err", err)
+			}
+
 			// Step 4: agent setup.
 			selectedAgents := resolveAgents(agents, repoDir, lg)
 			if len(selectedAgents) > 0 {
