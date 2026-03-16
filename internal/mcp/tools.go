@@ -84,6 +84,19 @@ func AllTools() []ToolDef {
 			},
 		},
 		{
+			Name:        "falcon_workspace_info",
+			Description: "Get workspace/monorepo structure: workspace members, their packages, and cross-member dependencies. Returns empty if the repository is not a monorepo.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"member": map[string]any{
+						"type":        "string",
+						"description": "Optional: specific workspace member name to get details for. Omit for overview of all members.",
+					},
+				},
+			},
+		},
+		{
 			Name:        "falcon_refresh",
 			Description: "Re-index the repository and reload the code knowledge graph. Call this after major refactoring (renamed packages, moved files, changed dependency structure). Not needed for small edits.",
 			InputSchema: map[string]any{

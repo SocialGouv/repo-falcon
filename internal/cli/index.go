@@ -14,6 +14,7 @@ import (
 	"repofalcon/internal/graph"
 	"repofalcon/internal/logging"
 	"repofalcon/internal/repo"
+	"repofalcon/internal/workspace"
 )
 
 func newIndexCmd() *cobra.Command {
@@ -50,6 +51,12 @@ func newIndexCmd() *cobra.Command {
 			recs, err := repo.Scan(repoRoot, repo.DefaultScanOptions())
 			if err != nil {
 				return err
+			}
+
+			// Detect workspace/monorepo structure (runs before extraction).
+			ws := workspace.Detect(repoRoot)
+			if !ws.IsEmpty() {
+				lg.Info("workspace detected", "members", len(ws.Members))
 			}
 
 			modulePath := readGoModulePath(filepath.Join(repoRoot, "go.mod"))
@@ -115,13 +122,14 @@ func newIndexCmd() *cobra.Command {
 						return fmt.Errorf("extract go %s: %w", fr.RepoRelPath, err)
 					}
 					pkgID := graph.NewPackageID("go", gof.PackageName)
-					packageByID[pkgID] = packageRowFor("go", gof.PackageName, true)
+					packageByID[pkgID] = wsPackageRowFor("go", gof.PackageName, true, ws, fr.RepoRelPath)
 
 					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, pkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
 
 					for _, imp := range gof.Imports {
 						impID := graph.NewPackageID("go", imp)
-						packageByID[impID] = packageRowFor("go", imp, strings.HasPrefix(imp, modulePath) && modulePath != "")
+						isInt := (strings.HasPrefix(imp, modulePath) && modulePath != "") || ws.IsGoWorkspaceImport(imp)
+						packageByID[impID] = wsPackageRowFor("go", imp, isInt, ws, "")
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), impID, string(graph.NodeTypePackage)))
 					}
 
@@ -166,12 +174,13 @@ func newIndexCmd() *cobra.Command {
 						dirPkg = ""
 					}
 					dirPkgID := graph.NewPackageID(fr.Language, dirPkg)
-					packageByID[dirPkgID] = packageRowFor(fr.Language, dirPkg, true)
+					packageByID[dirPkgID] = wsPackageRowFor(fr.Language, dirPkg, true, ws, fr.RepoRelPath)
 					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, dirPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
 
 					for _, imp := range jsf.Imports {
 						pid := graph.NewPackageID(fr.Language, imp)
-						packageByID[pid] = packageRowFor(fr.Language, imp, isJSInternalImport(imp))
+						isInt := isJSInternalImport(imp) || ws.IsWorkspacePackage(imp)
+						packageByID[pid] = wsPackageRowFor(fr.Language, imp, isInt, ws, "")
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
@@ -216,12 +225,13 @@ func newIndexCmd() *cobra.Command {
 						dirPkg = ""
 					}
 					dirPkgID := graph.NewPackageID("python", dirPkg)
-					packageByID[dirPkgID] = packageRowFor("python", dirPkg, true)
+					packageByID[dirPkgID] = wsPackageRowFor("python", dirPkg, true, ws, fr.RepoRelPath)
 					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, dirPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
 
 					for _, imp := range pyf.Imports {
 						pid := graph.NewPackageID("python", imp)
-						packageByID[pid] = packageRowFor("python", imp, isPythonInternalImport(imp, pythonPkgDirs))
+						isInt := isPythonInternalImport(imp, pythonPkgDirs) || ws.IsWorkspacePackage(imp)
+						packageByID[pid] = wsPackageRowFor("python", imp, isInt, ws, "")
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
@@ -274,12 +284,12 @@ func newIndexCmd() *cobra.Command {
 						}
 					}
 					javaPkgID := graph.NewPackageID("java", javaPkg)
-					packageByID[javaPkgID] = packageRowFor("java", javaPkg, true)
+					packageByID[javaPkgID] = wsPackageRowFor("java", javaPkg, true, ws, fr.RepoRelPath)
 					edgeRows = append(edgeRows, edgeRow(graph.EdgeContains, javaPkgID, string(graph.NodeTypePackage), fileID, string(graph.NodeTypeFile)))
 
 					for _, imp := range jf.Imports {
 						pid := graph.NewPackageID("java", imp)
-						packageByID[pid] = packageRowFor("java", imp, isJavaInternalImport(imp, javaRepoPkgs))
+						packageByID[pid] = wsPackageRowFor("java", imp, isJavaInternalImport(imp, javaRepoPkgs), ws, "")
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
@@ -375,7 +385,8 @@ func packagesToSortedSlice(m map[string]artifacts.PackageRow) []artifacts.Packag
 }
 
 func packageRowFor(ecosystem, name string, isInternal bool) artifacts.PackageRow {
-	// Scope/version are intentionally blank for now.
+	// Scope, Version, RootPath, and ManifestPath are intentionally blank here.
+	// Callers should use wsPackageRowFor to enrich with workspace metadata when available.
 	return artifacts.PackageRow{
 		PackageID:    graph.NewPackageID(ecosystem, name),
 		Ecosystem:    ecosystem,
@@ -386,6 +397,32 @@ func packageRowFor(ecosystem, name string, isInternal bool) artifacts.PackageRow
 		RootPath:     nil,
 		ManifestPath: nil,
 	}
+}
+
+// wsPackageRowFor creates a PackageRow enriched with workspace info when available.
+func wsPackageRowFor(ecosystem, name string, isInternal bool, ws *workspace.WorkspaceInfo, repoRelPath string) artifacts.PackageRow {
+	row := packageRowFor(ecosystem, name, isInternal)
+	if ws.IsEmpty() {
+		return row
+	}
+
+	// Try to find workspace member by file path first, then by package name.
+	var member *workspace.WorkspaceMember
+	if repoRelPath != "" {
+		member = ws.MemberForPath(repoRelPath)
+	}
+	if member == nil {
+		member = ws.ByPackageName[name]
+	}
+
+	if member != nil {
+		row.Scope = member.Name
+		rootPath := member.RootPath
+		row.RootPath = &rootPath
+		manifestPath := member.ManifestPath
+		row.ManifestPath = &manifestPath
+	}
+	return row
 }
 
 func edgeRow(edgeType graph.EdgeType, srcID, srcType, dstID, dstType string) artifacts.EdgeRow {
