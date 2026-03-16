@@ -427,12 +427,7 @@ func (g *GraphIndex) Architecture() string {
 	// Workspace members section (if any).
 	if len(g.PkgsByScope) > 0 {
 		b.WriteString("## Workspace Members\n\n")
-		var scopes []string
-		for scope := range g.PkgsByScope {
-			scopes = append(scopes, scope)
-		}
-		sort.Strings(scopes)
-		for _, scope := range scopes {
+		for _, scope := range g.sortedScopes() {
 			pkgs := g.PkgsByScope[scope]
 			fmt.Fprintf(&b, "- **%s** (%d packages)\n", scope, len(pkgs))
 		}
@@ -595,13 +590,7 @@ func (g *GraphIndex) WorkspaceInfo(member string) string {
 	fmt.Fprintf(&b, "# Workspace Overview\n\n")
 	fmt.Fprintf(&b, "- Members: %d\n\n", len(g.PkgsByScope))
 
-	var scopes []string
-	for scope := range g.PkgsByScope {
-		scopes = append(scopes, scope)
-	}
-	sort.Strings(scopes)
-
-	for _, scope := range scopes {
+	for _, scope := range g.sortedScopes() {
 		pkgs := g.PkgsByScope[scope]
 		var rootPath string
 		if len(pkgs) > 0 && pkgs[0].RootPath != nil {
@@ -624,13 +613,18 @@ func (g *GraphIndex) WorkspaceInfo(member string) string {
 	return b.String()
 }
 
-func (g *GraphIndex) workspaceMemberList() string {
-	var scopes []string
+// sortedScopes returns workspace scope names in sorted order.
+func (g *GraphIndex) sortedScopes() []string {
+	scopes := make([]string, 0, len(g.PkgsByScope))
 	for scope := range g.PkgsByScope {
 		scopes = append(scopes, scope)
 	}
 	sort.Strings(scopes)
-	return strings.Join(scopes, ", ")
+	return scopes
+}
+
+func (g *GraphIndex) workspaceMemberList() string {
+	return strings.Join(g.sortedScopes(), ", ")
 }
 
 func dedupStrings(s []string) []string {

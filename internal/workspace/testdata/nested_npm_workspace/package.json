@@ -1,0 +1,5 @@
+{
+  "name": "nested-workspace",
+  "private": true,
+  "workspaces": ["packages/**"]
+}

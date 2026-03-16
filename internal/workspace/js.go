@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,25 +140,34 @@ func expandGlob(repoRoot, pattern string) []string {
 	return dirs
 }
 
-// expandDoubleStarGlob handles patterns with "**" by walking subdirectories.
+// expandDoubleStarGlob handles patterns with "**" by recursively walking directories under the base path.
 func expandDoubleStarGlob(repoRoot, pattern string) []string {
-	// Replace "**" with single-level matching, walk directories.
-	// For patterns like "packages/**", find all immediate subdirs of "packages/".
 	base := strings.SplitN(pattern, "**", 2)[0]
 	base = strings.TrimSuffix(base, "/")
 
 	baseDir := filepath.Join(repoRoot, base)
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return nil
-	}
-
 	var dirs []string
-	for _, e := range entries {
-		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && e.Name() != "node_modules" {
-			dirs = append(dirs, filepath.Join(base, e.Name()))
+	filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable dirs
 		}
-	}
+		if !d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		if strings.HasPrefix(name, ".") || name == "node_modules" {
+			return filepath.SkipDir
+		}
+		// Skip the base dir itself — we want its descendants.
+		if path == baseDir {
+			return nil
+		}
+		rel, err := filepath.Rel(repoRoot, path)
+		if err == nil {
+			dirs = append(dirs, rel)
+		}
+		return nil
+	})
 	return dirs
 }
 

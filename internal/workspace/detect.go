@@ -20,6 +20,7 @@ type WorkspaceInfo struct {
 	Members       []WorkspaceMember
 	ByPackageName map[string]*WorkspaceMember // lookup by published package name
 	membersSorted []WorkspaceMember           // sorted by RootPath descending length for longest-prefix match
+	goModPrefixes []string                    // Go module path prefixes for fast import matching
 }
 
 // Detect scans a repository root for workspace manifests across all supported ecosystems.
@@ -53,6 +54,17 @@ func newWorkspaceInfo(members []WorkspaceMember) *WorkspaceInfo {
 	sort.Slice(ws.membersSorted, func(i, j int) bool {
 		return len(ws.membersSorted[i].RootPath) > len(ws.membersSorted[j].RootPath)
 	})
+
+	// Pre-collect Go module prefixes for fast import matching.
+	for i := range members {
+		if members[i].Ecosystem != "go" {
+			continue
+		}
+		for _, name := range members[i].PackageNames {
+			ws.goModPrefixes = append(ws.goModPrefixes, name)
+		}
+	}
+
 	return ws
 }
 
@@ -78,4 +90,21 @@ func (ws *WorkspaceInfo) MemberForPath(repoRelPath string) *WorkspaceMember {
 func (ws *WorkspaceInfo) IsWorkspacePackage(name string) bool {
 	_, ok := ws.ByPackageName[name]
 	return ok
+}
+
+// NewForTest creates a WorkspaceInfo from the given members with all indexes built.
+// Intended for use in tests outside the workspace package.
+func NewForTest(members []WorkspaceMember) *WorkspaceInfo {
+	return newWorkspaceInfo(members)
+}
+
+// IsGoWorkspaceImport returns true if a Go import path belongs to any workspace member module
+// (exact match or sub-package). Uses pre-computed prefixes for O(prefixes) lookup.
+func (ws *WorkspaceInfo) IsGoWorkspaceImport(importPath string) bool {
+	for _, prefix := range ws.goModPrefixes {
+		if importPath == prefix || strings.HasPrefix(importPath, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }

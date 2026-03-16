@@ -128,7 +128,7 @@ func newIndexCmd() *cobra.Command {
 
 					for _, imp := range gof.Imports {
 						impID := graph.NewPackageID("go", imp)
-						isInt := (strings.HasPrefix(imp, modulePath) && modulePath != "") || isGoWorkspaceInternal(imp, ws)
+						isInt := (strings.HasPrefix(imp, modulePath) && modulePath != "") || ws.IsGoWorkspaceImport(imp)
 						packageByID[impID] = wsPackageRowFor("go", imp, isInt, ws, "")
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), impID, string(graph.NodeTypePackage)))
 					}
@@ -385,6 +385,7 @@ func packagesToSortedSlice(m map[string]artifacts.PackageRow) []artifacts.Packag
 }
 
 func packageRowFor(ecosystem, name string, isInternal bool) artifacts.PackageRow {
+	// Version is intentionally blank; Scope is populated via wsPackageRowFor when workspace info is available.
 	return artifacts.PackageRow{
 		PackageID:    graph.NewPackageID(ecosystem, name),
 		Ecosystem:    ecosystem,
@@ -468,24 +469,6 @@ func isJavaInternalImport(target string, repoPkgs map[string]bool) bool {
 		candidate := strings.Join(parts[:i], ".")
 		if repoPkgs[candidate] {
 			return true
-		}
-	}
-	return false
-}
-
-// isGoWorkspaceInternal checks if a Go import path belongs to any workspace member module.
-func isGoWorkspaceInternal(importPath string, ws *workspace.WorkspaceInfo) bool {
-	if ws.IsEmpty() {
-		return false
-	}
-	for _, m := range ws.Members {
-		if m.Ecosystem != "go" {
-			continue
-		}
-		for _, pkgName := range m.PackageNames {
-			if importPath == pkgName || strings.HasPrefix(importPath, pkgName+"/") {
-				return true
-			}
 		}
 	}
 	return false

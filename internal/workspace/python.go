@@ -48,10 +48,12 @@ func detectUVWorkspace(repoRoot string) []WorkspaceMember {
 
 // parseUVWorkspaceMembers extracts member patterns from pyproject.toml content.
 // Looks for: members = ["packages/*", "libs/*"] under [tool.uv.workspace].
+// Supports both single-line and multiline array formats.
 func parseUVWorkspaceMembers(content string) []string {
 	inSection := false
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
 
 		// Detect section headers.
 		if strings.HasPrefix(trimmed, "[") {
@@ -74,7 +76,28 @@ func parseUVWorkspaceMembers(content string) []string {
 				continue
 			}
 			val := strings.TrimSpace(trimmed[idx+1:])
-			return parseTOMLStringArray(val)
+
+			// If the array is complete on one line, parse it directly.
+			if strings.Contains(val, "]") {
+				return parseTOMLStringArray(val)
+			}
+
+			// Multiline array: collect lines until we find the closing ']'.
+			var buf strings.Builder
+			buf.WriteString(val)
+			for i++; i < len(lines); i++ {
+				line := strings.TrimSpace(lines[i])
+				// Stop at a new section header.
+				if strings.HasPrefix(line, "[") {
+					break
+				}
+				buf.WriteString(" ")
+				buf.WriteString(line)
+				if strings.Contains(line, "]") {
+					break
+				}
+			}
+			return parseTOMLStringArray(buf.String())
 		}
 	}
 	return nil

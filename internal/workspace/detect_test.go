@@ -119,6 +119,19 @@ func TestDetectGradleWorkspace(t *testing.T) {
 	}
 }
 
+func TestDetectNestedNPMWorkspace(t *testing.T) {
+	ws := Detect(filepath.Join(testdataDir(), "nested_npm_workspace"))
+	if ws.IsEmpty() {
+		t.Fatal("expected nested npm workspace members, got empty")
+	}
+	if len(ws.Members) != 1 {
+		t.Fatalf("expected 1 member, got %d: %v", len(ws.Members), memberNames(ws))
+	}
+	if ws.Members[0].Name != "@nested/core" {
+		t.Fatalf("expected @nested/core, got %s", ws.Members[0].Name)
+	}
+}
+
 func TestDetectEmptyRepo(t *testing.T) {
 	ws := Detect(filepath.Join(testdataDir(), "empty_repo"))
 	if !ws.IsEmpty() {
@@ -149,6 +162,86 @@ func TestMemberForPath(t *testing.T) {
 	m = ws.MemberForPath("README.md")
 	if m != nil {
 		t.Fatalf("expected nil for root-level file, got %s", m.Name)
+	}
+}
+
+func TestParseUVWorkspaceMembersMultiline(t *testing.T) {
+	content := `[project]
+name = "my-monorepo"
+
+[tool.uv.workspace]
+members = [
+  "packages/*",
+  "libs/*",
+]
+
+[tool.other]
+key = "value"
+`
+	patterns := parseUVWorkspaceMembers(content)
+	if len(patterns) != 2 {
+		t.Fatalf("expected 2 patterns, got %d: %v", len(patterns), patterns)
+	}
+	if patterns[0] != "packages/*" || patterns[1] != "libs/*" {
+		t.Fatalf("unexpected patterns: %v", patterns)
+	}
+}
+
+func TestParseUVWorkspaceMembersSingleLine(t *testing.T) {
+	content := `[tool.uv.workspace]
+members = ["packages/*"]
+`
+	patterns := parseUVWorkspaceMembers(content)
+	if len(patterns) != 1 || patterns[0] != "packages/*" {
+		t.Fatalf("unexpected patterns: %v", patterns)
+	}
+}
+
+func TestIsGoWorkspaceImport(t *testing.T) {
+	ws := Detect(filepath.Join(testdataDir(), "go_workspace"))
+
+	tests := []struct {
+		importPath string
+		want       bool
+	}{
+		{"github.com/example/svc-a", true},
+		{"github.com/example/svc-a/internal/handler", true},
+		{"github.com/example/lib-b", true},
+		{"github.com/example/lib-b/pkg/util", true},
+		{"github.com/example/other", false},
+		{"github.com/example/svc-ab", false}, // must not match svc-a prefix
+		{"fmt", false},
+	}
+	for _, tt := range tests {
+		got := ws.IsGoWorkspaceImport(tt.importPath)
+		if got != tt.want {
+			t.Errorf("IsGoWorkspaceImport(%q) = %v, want %v", tt.importPath, got, tt.want)
+		}
+	}
+}
+
+func TestIsGoWorkspaceImportEmpty(t *testing.T) {
+	ws := newWorkspaceInfo(nil)
+	if ws.IsGoWorkspaceImport("anything") {
+		t.Error("expected false for empty workspace")
+	}
+}
+
+func TestParseGradleIncludesMultiline(t *testing.T) {
+	content := `rootProject.name = "my-project"
+
+include(
+  ":core",
+  ":web"
+)
+`
+	projects := parseGradleIncludes(content)
+	sort.Strings(projects)
+	if len(projects) != 2 {
+		t.Fatalf("expected 2 projects, got %d: %v", len(projects), projects)
+	}
+	if projects[0] != ":core" || projects[1] != ":web" {
+		t.Fatalf("unexpected projects: %v", projects)
 	}
 }
 

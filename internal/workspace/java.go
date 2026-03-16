@@ -142,39 +142,61 @@ func detectGradleProjects(repoRoot string) []WorkspaceMember {
 }
 
 // parseGradleIncludes extracts project names from Gradle settings file.
+// Supports single-line and multiline include directives.
 func parseGradleIncludes(content string) []string {
 	var projects []string
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
 		if strings.HasPrefix(trimmed, "//") || trimmed == "" {
 			continue
 		}
 
-		// Match include("project1", "project2") or include ':project1', ':project2'
+		// Single-line: include("project1", "project2") — regex matches closing paren.
 		matches := gradleIncludeRe.FindAllStringSubmatch(trimmed, -1)
 		for _, m := range matches {
 			if len(m) < 2 {
 				continue
 			}
-			// Extract quoted strings from the argument list.
-			quoted := gradleQuoteRe.FindAllStringSubmatch(m[1], -1)
-			for _, q := range quoted {
-				if len(q) >= 2 {
-					projects = append(projects, q[1])
+			projects = append(projects, extractQuoted(m[1])...)
+		}
+
+		// Multiline: include( on this line, closing ) on a later line.
+		if len(matches) == 0 && strings.Contains(trimmed, "include") && strings.Contains(trimmed, "(") && !strings.Contains(trimmed, ")") {
+			var buf strings.Builder
+			buf.WriteString(trimmed)
+			for i++; i < len(lines); i++ {
+				line := strings.TrimSpace(lines[i])
+				buf.WriteString(" ")
+				buf.WriteString(line)
+				if strings.Contains(line, ")") {
+					break
 				}
+			}
+			joined := buf.String()
+			m := gradleIncludeRe.FindStringSubmatch(joined)
+			if len(m) >= 2 {
+				projects = append(projects, extractQuoted(m[1])...)
 			}
 		}
 
-		// Also handle Groovy-style: include ':project1', ':project2' (no parentheses).
-		if strings.HasPrefix(trimmed, "include ") && !strings.Contains(trimmed, "(") {
+		// Groovy-style: include ':project1', ':project2' (no parentheses).
+		if !strings.Contains(trimmed, "(") && strings.HasPrefix(trimmed, "include ") {
 			rest := strings.TrimPrefix(trimmed, "include ")
-			quoted := gradleQuoteRe.FindAllStringSubmatch(rest, -1)
-			for _, q := range quoted {
-				if len(q) >= 2 {
-					projects = append(projects, q[1])
-				}
-			}
+			projects = append(projects, extractQuoted(rest)...)
 		}
 	}
 	return projects
+}
+
+// extractQuoted returns all quoted strings from s.
+func extractQuoted(s string) []string {
+	matches := gradleQuoteRe.FindAllStringSubmatch(s, -1)
+	var result []string
+	for _, q := range matches {
+		if len(q) >= 2 {
+			result = append(result, q[1])
+		}
+	}
+	return result
 }
