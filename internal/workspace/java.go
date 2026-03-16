@@ -31,14 +31,27 @@ func detectMavenModules(repoRoot string) []WorkspaceMember {
 		return nil
 	}
 
+	parentGroupID := parseMavenGroupID(data)
+
 	var members []WorkspaceMember
 	for _, mod := range modules {
-		m := readMavenMember(repoRoot, mod)
+		m := readMavenMember(repoRoot, mod, parentGroupID)
 		if m != nil {
 			members = append(members, *m)
 		}
 	}
 	return members
+}
+
+// parseMavenGroupID extracts the groupId from a pom.xml.
+func parseMavenGroupID(data []byte) string {
+	var pom struct {
+		GroupID string `xml:"groupId"`
+	}
+	if err := xml.Unmarshal(data, &pom); err != nil {
+		return ""
+	}
+	return pom.GroupID
 }
 
 // parseMavenModules extracts module names from a pom.xml.
@@ -55,7 +68,8 @@ func parseMavenModules(data []byte) []string {
 }
 
 // readMavenMember reads a module's pom.xml to get groupId:artifactId.
-func readMavenMember(repoRoot, relDir string) *WorkspaceMember {
+// parentGroupID is used as fallback when the child pom omits groupId (Maven inheritance).
+func readMavenMember(repoRoot, relDir, parentGroupID string) *WorkspaceMember {
 	pomPath := filepath.Join(repoRoot, relDir, "pom.xml")
 	data, err := os.ReadFile(pomPath)
 	if err != nil {
@@ -70,9 +84,15 @@ func readMavenMember(repoRoot, relDir string) *WorkspaceMember {
 		return nil
 	}
 
+	// Inherit groupId from parent if not specified in child.
+	groupID := pom.GroupID
+	if groupID == "" {
+		groupID = parentGroupID
+	}
+
 	name := pom.ArtifactID
-	if pom.GroupID != "" {
-		name = pom.GroupID + ":" + pom.ArtifactID
+	if groupID != "" {
+		name = groupID + ":" + pom.ArtifactID
 	}
 	if name == "" {
 		name = filepath.Base(relDir)

@@ -35,7 +35,9 @@ type GraphIndex struct {
 	FileImports map[string][]string // file_id → []package_id (IMPORTS)
 
 	// Workspace indexes.
-	PkgsByScope map[string][]artifacts.PackageRow // scope (workspace member name) → packages
+	// Keyed by workspace member name (e.g., "@myapp/core", "github.com/org/mod").
+	// Naming conventions across ecosystems are distinct enough that collisions are not expected.
+	PkgsByScope map[string][]artifacts.PackageRow
 }
 
 // LoadGraph loads all Parquet artifacts from snapshotDir and builds the index.

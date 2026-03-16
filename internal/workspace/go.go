@@ -42,6 +42,9 @@ func parseGoWorkUse(content string) []string {
 			continue
 		}
 
+		// Strip inline comments (e.g., "./dir // some note").
+		trimmed = stripInlineComment(trimmed)
+
 		if strings.HasPrefix(trimmed, "use (") || trimmed == "use (" {
 			inBlock = true
 			continue
@@ -90,6 +93,14 @@ func readGoMember(repoRoot, relDir string) *WorkspaceMember {
 		Ecosystem:    "go",
 		PackageNames: []string{modulePath},
 	}
+}
+
+// stripInlineComment removes a trailing "// ..." comment from a line.
+func stripInlineComment(s string) string {
+	if idx := strings.Index(s, "//"); idx >= 0 {
+		return strings.TrimSpace(s[:idx])
+	}
+	return s
 }
 
 // parseGoModModule extracts the module path from go.mod content.

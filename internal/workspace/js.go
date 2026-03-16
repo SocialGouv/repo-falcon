@@ -140,7 +140,12 @@ func expandGlob(repoRoot, pattern string) []string {
 	return dirs
 }
 
+// maxGlobDepth limits how deep expandDoubleStarGlob will recurse below the base directory.
+// Workspace packages are typically 1-3 levels deep; this avoids walking vendored or generated trees.
+const maxGlobDepth = 4
+
 // expandDoubleStarGlob handles patterns with "**" by recursively walking directories under the base path.
+// Walks at most maxGlobDepth levels below the base directory.
 func expandDoubleStarGlob(repoRoot, pattern string) []string {
 	base := strings.SplitN(pattern, "**", 2)[0]
 	base = strings.TrimSuffix(base, "/")
@@ -162,9 +167,18 @@ func expandDoubleStarGlob(repoRoot, pattern string) []string {
 		if path == baseDir {
 			return nil
 		}
-		rel, err := filepath.Rel(repoRoot, path)
+		rel, err := filepath.Rel(baseDir, path)
+		if err != nil {
+			return nil
+		}
+		// Enforce depth limit: count path separators.
+		depth := strings.Count(rel, string(filepath.Separator)) + 1
+		if depth > maxGlobDepth {
+			return filepath.SkipDir
+		}
+		relFromRoot, err := filepath.Rel(repoRoot, path)
 		if err == nil {
-			dirs = append(dirs, rel)
+			dirs = append(dirs, relFromRoot)
 		}
 		return nil
 	})

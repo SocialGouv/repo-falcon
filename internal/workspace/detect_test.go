@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -100,6 +101,23 @@ func TestDetectMavenWorkspace(t *testing.T) {
 	}
 	if !ws.IsWorkspacePackage("com.example:web") {
 		t.Error("expected com.example:web to be a workspace package")
+	}
+}
+
+func TestDetectMavenInheritedGroupID(t *testing.T) {
+	ws := Detect(filepath.Join(testdataDir(), "maven_inherited_workspace"))
+	if ws.IsEmpty() {
+		t.Fatal("expected maven workspace members, got empty")
+	}
+	if len(ws.Members) != 1 {
+		t.Fatalf("expected 1 member, got %d", len(ws.Members))
+	}
+	// Child pom omits groupId — should inherit "com.inherited" from parent.
+	if ws.Members[0].Name != "com.inherited:svc" {
+		t.Fatalf("expected com.inherited:svc, got %s", ws.Members[0].Name)
+	}
+	if !ws.IsWorkspacePackage("com.inherited:svc") {
+		t.Error("expected com.inherited:svc to be a workspace package")
 	}
 }
 
@@ -227,6 +245,34 @@ func TestIsGoWorkspaceImportEmpty(t *testing.T) {
 	}
 }
 
+func TestParseGoWorkUseWithInlineComments(t *testing.T) {
+	content := `go 1.21
+
+use (
+	./svc-a // main service
+	./lib-b // shared library
+)
+`
+	dirs := parseGoWorkUse(content)
+	if len(dirs) != 2 {
+		t.Fatalf("expected 2 dirs, got %d: %v", len(dirs), dirs)
+	}
+	if dirs[0] != "svc-a" || dirs[1] != "lib-b" {
+		t.Fatalf("unexpected dirs: %v", dirs)
+	}
+}
+
+func TestParseGoWorkUseSingleLineWithComment(t *testing.T) {
+	content := `go 1.21
+
+use ./mymod // workspace member
+`
+	dirs := parseGoWorkUse(content)
+	if len(dirs) != 1 || dirs[0] != "mymod" {
+		t.Fatalf("expected [mymod], got %v", dirs)
+	}
+}
+
 func TestParseGradleIncludesMultiline(t *testing.T) {
 	content := `rootProject.name = "my-project"
 
@@ -242,6 +288,43 @@ include(
 	}
 	if projects[0] != ":core" || projects[1] != ":web" {
 		t.Fatalf("unexpected projects: %v", projects)
+	}
+}
+
+func TestExpandDoubleStarGlob(t *testing.T) {
+	// nested_npm_workspace has packages/**/core structure.
+	root := filepath.Join(testdataDir(), "nested_npm_workspace")
+	dirs := expandDoubleStarGlob(root, "packages/**")
+	if len(dirs) == 0 {
+		t.Fatal("expected at least one directory from packages/**")
+	}
+
+	// Should find "packages/group" and "packages/group/core" (the nested structure).
+	found := map[string]bool{}
+	for _, d := range dirs {
+		found[d] = true
+	}
+	if !found["packages/group"] {
+		t.Errorf("expected packages/group in results, got %v", dirs)
+	}
+	if !found["packages/group/core"] {
+		t.Errorf("expected packages/group/core in results, got %v", dirs)
+	}
+}
+
+func TestExpandDoubleStarGlobSkipsHiddenAndNodeModules(t *testing.T) {
+	// expandDoubleStarGlob should skip .hidden dirs and node_modules.
+	// We test this by checking no results contain these patterns.
+	root := filepath.Join(testdataDir(), "nested_npm_workspace")
+	dirs := expandDoubleStarGlob(root, "packages/**")
+	for _, d := range dirs {
+		base := filepath.Base(d)
+		if strings.HasPrefix(base, ".") {
+			t.Errorf("found hidden dir in results: %s", d)
+		}
+		if base == "node_modules" {
+			t.Errorf("found node_modules in results: %s", d)
+		}
 	}
 }
 

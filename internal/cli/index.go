@@ -385,7 +385,8 @@ func packagesToSortedSlice(m map[string]artifacts.PackageRow) []artifacts.Packag
 }
 
 func packageRowFor(ecosystem, name string, isInternal bool) artifacts.PackageRow {
-	// Version is intentionally blank; Scope is populated via wsPackageRowFor when workspace info is available.
+	// Scope, Version, RootPath, and ManifestPath are intentionally blank here.
+	// Callers should use wsPackageRowFor to enrich with workspace metadata when available.
 	return artifacts.PackageRow{
 		PackageID:    graph.NewPackageID(ecosystem, name),
 		Ecosystem:    ecosystem,
