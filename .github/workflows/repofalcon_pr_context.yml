@@ -11,6 +11,9 @@ jobs:
   repofalcon:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout (needed for local action resolution)
+        uses: actions/checkout@v6
+
       - name: Generate RepoFalcon artifacts (index + snapshot + pr-pack)
         id: falcon
         uses: ./
