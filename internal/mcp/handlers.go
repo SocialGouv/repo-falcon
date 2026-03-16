@@ -43,6 +43,10 @@ func HandleToolCall(name string, args map[string]any, s *Server) (string, error)
 		scope, _ := args["scope"].(string)
 		return s.graph.Search(query, scope), nil
 
+	case "falcon_workspace_info":
+		member, _ := args["member"].(string)
+		return s.graph.WorkspaceInfo(member), nil
+
 	case "falcon_refresh":
 		return handleRefresh(s)
 

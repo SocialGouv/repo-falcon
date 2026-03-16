@@ -33,6 +33,9 @@ type GraphIndex struct {
 	EdgesByDst  map[string][]artifacts.EdgeRow
 	PkgFiles    map[string][]string // package_id → []file_id (CONTAINS)
 	FileImports map[string][]string // file_id → []package_id (IMPORTS)
+
+	// Workspace indexes.
+	PkgsByScope map[string][]artifacts.PackageRow // scope (workspace member name) → packages
 }
 
 // LoadGraph loads all Parquet artifacts from snapshotDir and builds the index.
@@ -75,6 +78,7 @@ func LoadGraph(ctx context.Context, snapshotDir string) (*GraphIndex, error) {
 		EdgesByDst:  make(map[string][]artifacts.EdgeRow),
 		PkgFiles:    make(map[string][]string),
 		FileImports: make(map[string][]string),
+		PkgsByScope: make(map[string][]artifacts.PackageRow),
 	}
 
 	for _, f := range files {
@@ -84,6 +88,9 @@ func LoadGraph(ctx context.Context, snapshotDir string) (*GraphIndex, error) {
 	for _, p := range packages {
 		g.PkgByID[p.PackageID] = p
 		g.PkgByName[p.Name] = p
+		if p.Scope != "" {
+			g.PkgsByScope[p.Scope] = append(g.PkgsByScope[p.Scope], p)
+		}
 	}
 	for _, s := range symbols {
 		g.SymByID[s.SymbolID] = s
@@ -278,6 +285,12 @@ func (g *GraphIndex) PackageInfo(name string) string {
 	fmt.Fprintf(&b, "# Package: %s\n\n", pkg.Name)
 	fmt.Fprintf(&b, "- Ecosystem: %s\n", pkg.Ecosystem)
 	fmt.Fprintf(&b, "- Internal: %v\n", pkg.IsInternal)
+	if pkg.Scope != "" {
+		fmt.Fprintf(&b, "- Workspace member: %s\n", pkg.Scope)
+	}
+	if pkg.RootPath != nil {
+		fmt.Fprintf(&b, "- Root path: %s\n", *pkg.RootPath)
+	}
 	if pkg.Version != "" {
 		fmt.Fprintf(&b, "- Version: %s\n", pkg.Version)
 	}
@@ -405,8 +418,26 @@ func (g *GraphIndex) Architecture() string {
 	}
 	fmt.Fprintf(&b, "- Internal packages: %d\n", intCount)
 	fmt.Fprintf(&b, "- External dependencies: %d\n", extCount)
+	if len(g.PkgsByScope) > 0 {
+		fmt.Fprintf(&b, "- Workspace members: %d\n", len(g.PkgsByScope))
+	}
 	fmt.Fprintf(&b, "- Symbols: %d\n", len(g.Symbols))
 	fmt.Fprintf(&b, "- Edges: %d\n\n", len(g.Edges))
+
+	// Workspace members section (if any).
+	if len(g.PkgsByScope) > 0 {
+		b.WriteString("## Workspace Members\n\n")
+		var scopes []string
+		for scope := range g.PkgsByScope {
+			scopes = append(scopes, scope)
+		}
+		sort.Strings(scopes)
+		for _, scope := range scopes {
+			pkgs := g.PkgsByScope[scope]
+			fmt.Fprintf(&b, "- **%s** (%d packages)\n", scope, len(pkgs))
+		}
+		b.WriteString("\n")
+	}
 
 	// Internal package list with their files.
 	b.WriteString("## Internal Packages\n\n")
@@ -497,6 +528,109 @@ func (g *GraphIndex) Search(query, scope string) string {
 	}
 
 	return b.String()
+}
+
+// WorkspaceInfo returns workspace/monorepo structure details.
+// If member is non-empty, returns detail for that specific member.
+func (g *GraphIndex) WorkspaceInfo(member string) string {
+	if len(g.PkgsByScope) == 0 {
+		return "No workspace/monorepo structure detected in this repository."
+	}
+
+	var b strings.Builder
+
+	if member != "" {
+		// Detail for a specific member.
+		pkgs, ok := g.PkgsByScope[member]
+		if !ok {
+			return fmt.Sprintf("Workspace member not found: %s\nAvailable members: %s", member, g.workspaceMemberList())
+		}
+
+		fmt.Fprintf(&b, "# Workspace Member: %s\n\n", member)
+		if len(pkgs) > 0 && pkgs[0].RootPath != nil {
+			fmt.Fprintf(&b, "- Root: %s\n", *pkgs[0].RootPath)
+		}
+		if len(pkgs) > 0 && pkgs[0].ManifestPath != nil {
+			fmt.Fprintf(&b, "- Manifest: %s\n", *pkgs[0].ManifestPath)
+		}
+		fmt.Fprintf(&b, "- Packages: %d\n\n", len(pkgs))
+
+		b.WriteString("## Packages\n\n")
+		for _, p := range pkgs {
+			fileCount := len(g.PkgFiles[p.PackageID])
+			fmt.Fprintf(&b, "- %s (%s, %d files)\n", p.Name, p.Ecosystem, fileCount)
+		}
+		b.WriteString("\n")
+
+		// Cross-member dependencies.
+		b.WriteString("## Cross-member Dependencies\n\n")
+		depMembers := map[string]bool{}
+		for _, p := range pkgs {
+			for _, fid := range g.PkgFiles[p.PackageID] {
+				for _, impID := range g.FileImports[fid] {
+					if impPkg, ok := g.PkgByID[impID]; ok && impPkg.Scope != "" && impPkg.Scope != member {
+						depMembers[impPkg.Scope] = true
+					}
+				}
+			}
+		}
+		if len(depMembers) > 0 {
+			var deps []string
+			for d := range depMembers {
+				deps = append(deps, d)
+			}
+			sort.Strings(deps)
+			for _, d := range deps {
+				fmt.Fprintf(&b, "- → %s\n", d)
+			}
+		} else {
+			b.WriteString("(none)\n")
+		}
+		b.WriteString("\n")
+
+		return b.String()
+	}
+
+	// Overview of all workspace members.
+	fmt.Fprintf(&b, "# Workspace Overview\n\n")
+	fmt.Fprintf(&b, "- Members: %d\n\n", len(g.PkgsByScope))
+
+	var scopes []string
+	for scope := range g.PkgsByScope {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+
+	for _, scope := range scopes {
+		pkgs := g.PkgsByScope[scope]
+		var rootPath string
+		if len(pkgs) > 0 && pkgs[0].RootPath != nil {
+			rootPath = *pkgs[0].RootPath
+		}
+
+		// Count files across all packages in this member.
+		fileCount := 0
+		for _, p := range pkgs {
+			fileCount += len(g.PkgFiles[p.PackageID])
+		}
+
+		fmt.Fprintf(&b, "## %s\n\n", scope)
+		if rootPath != "" {
+			fmt.Fprintf(&b, "- Root: %s\n", rootPath)
+		}
+		fmt.Fprintf(&b, "- Packages: %d, Files: %d\n\n", len(pkgs), fileCount)
+	}
+
+	return b.String()
+}
+
+func (g *GraphIndex) workspaceMemberList() string {
+	var scopes []string
+	for scope := range g.PkgsByScope {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+	return strings.Join(scopes, ", ")
 }
 
 func dedupStrings(s []string) []string {

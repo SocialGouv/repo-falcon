@@ -5,7 +5,7 @@ overview of the repository's code graph for use by coding agents.
 
 ## Overview
 
-- Total files: 7
+- Total files: 8
 - Languages: python (5), go (1)
 - Internal packages: 6
 - External dependencies: 5
