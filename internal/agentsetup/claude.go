@@ -23,7 +23,7 @@ func ConfigureClaude(repoRoot, falconBin string) error {
 		return err
 	}
 
-	// 3. Configure Stop hook in .claude/settings.json.
+	// 3. Configure SessionStart hook in .claude/settings.json.
 	hooksPath := filepath.Join(repoRoot, ".claude", "settings.json")
 	return upsertClaudeHooks(hooksPath, falconBin)
 }
@@ -74,9 +74,9 @@ func upsertClaudeHooks(settingsPath, falconBin string) error {
 		hooks = make(map[string]any)
 	}
 
-	stopHooks, _ := hooks["Stop"].([]any)
+	startHooks, _ := hooks["SessionStart"].([]any)
 
-	if !containsFalconHook(stopHooks, hookCmd) {
+	if !containsFalconHook(startHooks, hookCmd) {
 		hookEntry := map[string]any{
 			"hooks": []any{
 				map[string]any{
@@ -87,10 +87,10 @@ func upsertClaudeHooks(settingsPath, falconBin string) error {
 				},
 			},
 		}
-		stopHooks = append(stopHooks, hookEntry)
+		startHooks = append(startHooks, hookEntry)
 	}
 
-	hooks["Stop"] = stopHooks
+	hooks["SessionStart"] = startHooks
 	settings["hooks"] = hooks
 
 	out, err := json.MarshalIndent(settings, "", "  ")
@@ -104,8 +104,8 @@ func upsertClaudeHooks(settingsPath, falconBin string) error {
 // containsFalconHook checks whether any hook group already contains a
 // falcon sync command. If found with a different binary path, it updates
 // the command in place.
-func containsFalconHook(stopHooks []any, hookCmd string) bool {
-	for _, group := range stopHooks {
+func containsFalconHook(hookGroups []any, hookCmd string) bool {
+	for _, group := range hookGroups {
 		groupMap, ok := group.(map[string]any)
 		if !ok {
 			continue
