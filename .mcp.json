@@ -2,10 +2,12 @@
   "mcpServers": {
     "falcon": {
       "args": [
+        "-y",
+        "repo-falcon",
         "mcp",
         "serve"
       ],
-      "command": "falcon",
+      "command": "npx",
       "type": "stdio"
     }
   }

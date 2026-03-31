@@ -1,11 +1,11 @@
 {
   "hooks": {
-    "Stop": [
+    "SessionStart": [
       {
         "hooks": [
           {
             "async": true,
-            "command": "falcon sync --agents none",
+            "command": "npx -y repo-falcon sync --agents none",
             "timeout": 300,
             "type": "command"
           }
