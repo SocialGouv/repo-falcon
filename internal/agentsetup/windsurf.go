@@ -9,7 +9,7 @@ import (
 // ConfigureWindsurf sets up Windsurf integration for the given repository.
 // It creates/updates .windsurfrules with instructions and configures
 // the MCP server in .windsurf/mcp.json.
-func ConfigureWindsurf(repoRoot, falconBin string) error {
+func ConfigureWindsurf(repoRoot string) error {
 	// 1. Update .windsurfrules with falcon instructions.
 	rulesFile := filepath.Join(repoRoot, ".windsurfrules")
 	if err := UpsertSection(rulesFile, falconInstructions); err != nil {
@@ -17,10 +17,10 @@ func ConfigureWindsurf(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .windsurf/mcp.json.
-	return upsertWindsurfMCP(filepath.Join(repoRoot, ".windsurf", "mcp.json"), falconBin)
+	return upsertWindsurfMCP(filepath.Join(repoRoot, ".windsurf", "mcp.json"))
 }
 
-func upsertWindsurfMCP(mcpPath, falconBin string) error {
+func upsertWindsurfMCP(mcpPath string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func upsertWindsurfMCP(mcpPath, falconBin string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin)
+	mcpServers["falcon"] = mcpServerConfig()
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

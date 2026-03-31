@@ -17,6 +17,6 @@
     }
   },
   "hooks": {
-    "after:bump": "make build"
+    "after:bump": "make build && npm version ${version} --no-git-tag-version --prefix npm && git add npm/package.json"
   }
 }

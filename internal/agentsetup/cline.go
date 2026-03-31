@@ -9,7 +9,7 @@ import (
 // ConfigureCline sets up Cline integration for the given repository.
 // It creates/updates .clinerules with falcon instructions and configures
 // the MCP server in .cline/mcp_settings.json.
-func ConfigureCline(repoRoot, falconBin string) error {
+func ConfigureCline(repoRoot string) error {
 	// 1. Update .clinerules with falcon instructions.
 	clinerules := filepath.Join(repoRoot, ".clinerules")
 	if err := UpsertSection(clinerules, falconInstructions); err != nil {
@@ -17,10 +17,10 @@ func ConfigureCline(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .cline/mcp_settings.json.
-	return upsertClineMCP(filepath.Join(repoRoot, ".cline", "mcp_settings.json"), falconBin)
+	return upsertClineMCP(filepath.Join(repoRoot, ".cline", "mcp_settings.json"))
 }
 
-func upsertClineMCP(mcpPath, falconBin string) error {
+func upsertClineMCP(mcpPath string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func upsertClineMCP(mcpPath, falconBin string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin)
+	mcpServers["falcon"] = mcpServerConfig()
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

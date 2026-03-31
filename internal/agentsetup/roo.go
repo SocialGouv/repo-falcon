@@ -9,7 +9,7 @@ import (
 // ConfigureRoo sets up Roo Code integration for the given repository.
 // It creates .roo/rules/falcon.md with instructions and .roo/mcp.json
 // with the MCP server configuration.
-func ConfigureRoo(repoRoot, falconBin string) error {
+func ConfigureRoo(repoRoot string) error {
 	// 1. Create .roo/rules/falcon.md with instructions.
 	rulesDir := filepath.Join(repoRoot, ".roo", "rules")
 	if err := os.MkdirAll(rulesDir, 0o755); err != nil {
@@ -21,10 +21,10 @@ func ConfigureRoo(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .roo/mcp.json.
-	return upsertRooMCP(filepath.Join(repoRoot, ".roo", "mcp.json"), falconBin)
+	return upsertRooMCP(filepath.Join(repoRoot, ".roo", "mcp.json"))
 }
 
-func upsertRooMCP(mcpPath, falconBin string) error {
+func upsertRooMCP(mcpPath string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func upsertRooMCP(mcpPath, falconBin string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin)
+	mcpServers["falcon"] = mcpServerConfig()
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

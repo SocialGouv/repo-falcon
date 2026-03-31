@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-binaries:
@@ -141,3 +142,32 @@ jobs:
           git add Formula/falcon.rb
           git commit -m "Update falcon to ${{ github.ref_name }}"
           git push -u origin HEAD:main
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Extract npm tag
+        id: npm-tag
+        run: |
+          if [[ "$GITHUB_REF" == *"alpha"* ]]; then
+            npm_tag="alpha"
+          elif [[ "$GITHUB_REF" == *"beta"* ]]; then
+            npm_tag="beta"
+          else
+            npm_tag="latest"
+          fi
+          echo "tag=$npm_tag" >> $GITHUB_OUTPUT
+
+      - name: Publish to npm
+        working-directory: npm
+        env:
+          REPO_FALCON_SKIP_INSTALL: "1"
+        run: npm publish --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public

@@ -19,10 +19,10 @@ These tools are faster and more accurate than grep — they use a pre-computed d
 If the MCP tools are unavailable, read ` + "`.falcon/CONTEXT.md`" + ` for a static architecture summary as a fallback.`
 
 // mcpServerConfig returns a JSON-compatible map for the falcon MCP server entry.
-func mcpServerConfig(falconBin string) map[string]any {
+func mcpServerConfig() map[string]any {
 	return map[string]any{
 		"type":    "stdio",
-		"command": falconBin,
-		"args":    []string{"mcp", "serve"},
+		"command": "npx",
+		"args":    []string{"-y", "repo-falcon", "mcp", "serve"},
 	}
 }

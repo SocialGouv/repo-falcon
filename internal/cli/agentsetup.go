@@ -44,7 +44,7 @@ a new agent into an already-indexed repository.`,
 
 			lg.Info("configuring coding agents")
 			for _, id := range selectedAgents {
-				if err := configureAgent(id, repoDir, "falcon", lg); err != nil {
+				if err := configureAgent(id, repoDir, lg); err != nil {
 					return fmt.Errorf("agent %s: %w", id, err)
 				}
 			}

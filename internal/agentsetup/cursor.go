@@ -9,7 +9,7 @@ import (
 // ConfigureCursor sets up Cursor integration for the given repository.
 // It creates .cursor/rules/falcon.mdc with instructions and configures
 // the MCP server in .cursor/mcp.json.
-func ConfigureCursor(repoRoot, falconBin string) error {
+func ConfigureCursor(repoRoot string) error {
 	// 1. Create .cursor/rules/falcon.mdc with instructions.
 	rulesDir := filepath.Join(repoRoot, ".cursor", "rules")
 	if err := os.MkdirAll(rulesDir, 0o755); err != nil {
@@ -27,10 +27,10 @@ alwaysApply: true
 	}
 
 	// 2. Configure MCP server in .cursor/mcp.json.
-	return upsertCursorMCP(filepath.Join(repoRoot, ".cursor", "mcp.json"), falconBin)
+	return upsertCursorMCP(filepath.Join(repoRoot, ".cursor", "mcp.json"))
 }
 
-func upsertCursorMCP(mcpPath, falconBin string) error {
+func upsertCursorMCP(mcpPath string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func upsertCursorMCP(mcpPath, falconBin string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin)
+	mcpServers["falcon"] = mcpServerConfig()
 	config["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(config, "", "  ")

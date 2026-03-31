@@ -9,7 +9,7 @@ import (
 // ConfigureCopilot sets up GitHub Copilot integration for the given repository.
 // It creates/updates .github/copilot-instructions.md with instructions and
 // configures the MCP server in .vscode/mcp.json.
-func ConfigureCopilot(repoRoot, falconBin string) error {
+func ConfigureCopilot(repoRoot string) error {
 	// 1. Update .github/copilot-instructions.md with falcon instructions.
 	ghDir := filepath.Join(repoRoot, ".github")
 	if err := os.MkdirAll(ghDir, 0o755); err != nil {
@@ -21,10 +21,10 @@ func ConfigureCopilot(repoRoot, falconBin string) error {
 	}
 
 	// 2. Configure MCP server in .vscode/mcp.json.
-	return upsertCopilotMCP(filepath.Join(repoRoot, ".vscode", "mcp.json"), falconBin)
+	return upsertCopilotMCP(filepath.Join(repoRoot, ".vscode", "mcp.json"))
 }
 
-func upsertCopilotMCP(mcpPath, falconBin string) error {
+func upsertCopilotMCP(mcpPath string) error {
 	if err := os.MkdirAll(filepath.Dir(mcpPath), 0o755); err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func upsertCopilotMCP(mcpPath, falconBin string) error {
 	if !ok {
 		servers = make(map[string]any)
 	}
-	servers["falcon"] = mcpServerConfig(falconBin)
+	servers["falcon"] = mcpServerConfig()
 	config["servers"] = servers
 
 	out, err := json.MarshalIndent(config, "", "  ")

@@ -10,7 +10,7 @@ import (
 // ConfigureClaude sets up Claude Code integration for the given repository.
 // It creates/updates CLAUDE.md with falcon instructions and configures
 // the MCP server in .mcp.json.
-func ConfigureClaude(repoRoot, falconBin string) error {
+func ConfigureClaude(repoRoot string) error {
 	// 1. Update CLAUDE.md with falcon instructions.
 	claudeMD := filepath.Join(repoRoot, "CLAUDE.md")
 	if err := UpsertSection(claudeMD, falconInstructions); err != nil {
@@ -19,16 +19,16 @@ func ConfigureClaude(repoRoot, falconBin string) error {
 
 	// 2. Configure MCP server in .mcp.json.
 	settingsPath := filepath.Join(repoRoot, ".mcp.json")
-	if err := upsertClaudeSettings(settingsPath, falconBin); err != nil {
+	if err := upsertClaudeSettings(settingsPath); err != nil {
 		return err
 	}
 
 	// 3. Configure SessionStart hook in .claude/settings.json.
 	hooksPath := filepath.Join(repoRoot, ".claude", "settings.json")
-	return upsertClaudeHooks(hooksPath, falconBin)
+	return upsertClaudeHooks(hooksPath)
 }
 
-func upsertClaudeSettings(settingsPath, falconBin string) error {
+func upsertClaudeSettings(settingsPath string) error {
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func upsertClaudeSettings(settingsPath, falconBin string) error {
 	if !ok {
 		mcpServers = make(map[string]any)
 	}
-	mcpServers["falcon"] = mcpServerConfig(falconBin)
+	mcpServers["falcon"] = mcpServerConfig()
 	settings["mcpServers"] = mcpServers
 
 	out, err := json.MarshalIndent(settings, "", "  ")
@@ -56,7 +56,7 @@ func upsertClaudeSettings(settingsPath, falconBin string) error {
 	return os.WriteFile(settingsPath, out, 0o644)
 }
 
-func upsertClaudeHooks(settingsPath, falconBin string) error {
+func upsertClaudeHooks(settingsPath string) error {
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func upsertClaudeHooks(settingsPath, falconBin string) error {
 		_ = json.Unmarshal(data, &settings)
 	}
 
-	hookCmd := falconBin + " sync --agents none"
+	hookCmd := "npx -y repo-falcon sync --agents none"
 
 	hooks, _ := settings["hooks"].(map[string]any)
 	if hooks == nil {

@@ -4,3 +4,4 @@ artifacts
 node_modules/
 .claude/*.local.json
 .falcon/
+npm/bin/

@@ -86,7 +86,7 @@ code knowledge graph via MCP tools and static context files.`,
 			if len(selectedAgents) > 0 {
 				lg.Info("step 4/4: configuring coding agents")
 				for _, id := range selectedAgents {
-					if err := configureAgent(id, repoDir, "falcon", lg); err != nil {
+					if err := configureAgent(id, repoDir, lg); err != nil {
 						lg.Warn("failed to configure agent", "agent", string(id), "err", err)
 					}
 				}
@@ -165,41 +165,41 @@ func resolveAgents(flagVal string, repoRoot string, lg *slog.Logger) []agentsetu
 }
 
 // configureAgent dispatches to the appropriate agent configurator.
-func configureAgent(id agentsetup.AgentID, repoRoot, falconBin string, lg *slog.Logger) error {
+func configureAgent(id agentsetup.AgentID, repoRoot string, lg *slog.Logger) error {
 	switch id {
 	case agentsetup.AgentClaude:
 		lg.Info("configuring Claude Code", "repo", repoRoot)
-		if err := agentsetup.ConfigureClaude(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureClaude(repoRoot); err != nil {
 			return fmt.Errorf("claude setup: %w", err)
 		}
 		lg.Info("  created/updated CLAUDE.md and .mcp.json")
 	case agentsetup.AgentCursor:
 		lg.Info("configuring Cursor", "repo", repoRoot)
-		if err := agentsetup.ConfigureCursor(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureCursor(repoRoot); err != nil {
 			return fmt.Errorf("cursor setup: %w", err)
 		}
 		lg.Info("  created/updated .cursor/rules/falcon.mdc and .cursor/mcp.json")
 	case agentsetup.AgentWindsurf:
 		lg.Info("configuring Windsurf", "repo", repoRoot)
-		if err := agentsetup.ConfigureWindsurf(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureWindsurf(repoRoot); err != nil {
 			return fmt.Errorf("windsurf setup: %w", err)
 		}
 		lg.Info("  created/updated .windsurfrules and .windsurf/mcp.json")
 	case agentsetup.AgentCopilot:
 		lg.Info("configuring GitHub Copilot", "repo", repoRoot)
-		if err := agentsetup.ConfigureCopilot(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureCopilot(repoRoot); err != nil {
 			return fmt.Errorf("copilot setup: %w", err)
 		}
 		lg.Info("  created/updated .github/copilot-instructions.md and .vscode/mcp.json")
 	case agentsetup.AgentRoo:
 		lg.Info("configuring Roo Code", "repo", repoRoot)
-		if err := agentsetup.ConfigureRoo(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureRoo(repoRoot); err != nil {
 			return fmt.Errorf("roo setup: %w", err)
 		}
 		lg.Info("  created .roo/rules/falcon.md and .roo/mcp.json")
 	case agentsetup.AgentCline:
 		lg.Info("configuring Cline", "repo", repoRoot)
-		if err := agentsetup.ConfigureCline(repoRoot, falconBin); err != nil {
+		if err := agentsetup.ConfigureCline(repoRoot); err != nil {
 			return fmt.Errorf("cline setup: %w", err)
 		}
 		lg.Info("  created/updated .clinerules and .cline/mcp_settings.json")
