@@ -82,7 +82,7 @@ func upsertClaudeHooks(settingsPath string) error {
 				map[string]any{
 					"type":    "command",
 					"command": hookCmd,
-					"async":   true,
+					"async":   false,
 					"timeout": 300,
 				},
 			},
@@ -121,7 +121,7 @@ func containsFalconHook(hookGroups []any, hookCmd string) bool {
 			}
 			if cmd, ok := hMap["command"].(string); ok && strings.Contains(cmd, "falcon sync") {
 				hMap["command"] = hookCmd
-				hMap["async"] = true
+				hMap["async"] = false
 				hMap["timeout"] = float64(300)
 				return true
 			}
