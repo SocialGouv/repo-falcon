@@ -1,6 +1,6 @@
 {
   "name": "repo-falcon",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "RepoFalcon — code knowledge graph CLI for coding agents",
   "license": "MIT",
   "repository": {
