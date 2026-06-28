@@ -12,6 +12,7 @@ type GoFile struct {
 	PackageName string
 	Imports     []string
 	Symbols     []Symbol
+	References  []Reference
 }
 
 func ExtractGoFile(repoRelPath string, src []byte) (GoFile, error) {
@@ -50,6 +51,7 @@ func ExtractGoFile(repoRelPath string, src []byte) (GoFile, error) {
 				q = recvTypeName(dd.Recv.List[0].Type) + "." + dd.Name.Name
 			}
 			out.Symbols = append(out.Symbols, symFromPositions(fset, dd.Name.Pos(), dd.End(), kind, dd.Name.Name, q))
+			out.References = append(out.References, goCallRefs(fset, q, dd.Body)...)
 		case *ast.GenDecl:
 			switch dd.Tok {
 			case token.TYPE:
@@ -117,6 +119,48 @@ func symFromPositions(fset *token.FileSet, startPos, endPos token.Pos, kind, nam
 		EndLine:       ep.Line,
 		EndCol:        ep.Column,
 	}
+}
+
+// goCallRefs walks a function body and records every call site as a Reference
+// from the enclosing symbol (fromQualified). The callee name is the function or
+// method identifier; Qualifier carries the receiver/package selector when
+// present (e.g. `pkg` in pkg.Func, `x` in x.Method). Resolution to a concrete
+// target symbol id happens later in the index, by name.
+func goCallRefs(fset *token.FileSet, fromQualified string, body *ast.BlockStmt) []Reference {
+	if body == nil {
+		return nil
+	}
+	var refs []Reference
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		var name, qualifier string
+		switch fn := call.Fun.(type) {
+		case *ast.Ident:
+			name = fn.Name
+		case *ast.SelectorExpr:
+			name = fn.Sel.Name
+			if x, ok := fn.X.(*ast.Ident); ok {
+				qualifier = x.Name
+			}
+		}
+		if name == "" {
+			return true
+		}
+		pos := fset.PositionFor(call.Pos(), true)
+		refs = append(refs, Reference{
+			FromQualified: fromQualified,
+			Callee:        name,
+			Qualifier:     qualifier,
+			Kind:          "call",
+			Line:          pos.Line,
+			Col:           pos.Column,
+		})
+		return true
+	})
+	return refs
 }
 
 func recvTypeName(expr ast.Expr) string {

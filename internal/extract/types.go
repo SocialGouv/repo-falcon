@@ -23,3 +23,17 @@ type Symbol struct {
 	EndLine       int
 	EndCol        int
 }
+
+// Reference is a use-site of one symbol from inside another (a function call or
+// an identifier reference). It is name-based: the index resolver maps Callee
+// (and optional Qualifier) to a concrete target symbol id, producing CALLS /
+// REFERENCES edges. FromQualified is the QualifiedName of the enclosing
+// (caller) symbol, used to locate the source symbol id.
+type Reference struct {
+	FromQualified string // qualified name of the enclosing symbol
+	Callee        string // simple name being called/referenced
+	Qualifier     string // optional receiver/module qualifier (e.g. pkg alias)
+	Kind          string // "call" or "reference"
+	Line          int
+	Col           int
+}

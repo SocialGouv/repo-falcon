@@ -12,8 +12,9 @@ import (
 
 // PythonFile is the result of extracting imports and symbols from a Python file.
 type PythonFile struct {
-	Imports []string
-	Symbols []Symbol
+	Imports    []string
+	Symbols    []Symbol
+	References []Reference
 }
 
 // ExtractPythonFile parses a Python file with tree-sitter and extracts
@@ -97,7 +98,8 @@ func ExtractPythonFile(repoRelPath string, content []byte) (PythonFile, error) {
 		return a.QualifiedName < b.QualifiedName
 	})
 
-	return PythonFile{Imports: imports, Symbols: symbols}, nil
+	refs := attributeRefs(symbols, collectCallSites(root, content, tsPython))
+	return PythonFile{Imports: imports, Symbols: symbols, References: refs}, nil
 }
 
 // pyExtractImportStatement handles:

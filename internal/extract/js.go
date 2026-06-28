@@ -15,8 +15,9 @@ import (
 
 // JSFile is the result of extracting imports and symbols from a JS/TS file.
 type JSFile struct {
-	Imports []string
-	Symbols []Symbol
+	Imports    []string
+	Symbols    []Symbol
+	References []Reference
 }
 
 // ExtractJSFile parses a JS/TS/JSX/TSX file with tree-sitter and extracts
@@ -95,7 +96,8 @@ func ExtractJSFile(repoRelPath string, content []byte, langTag string) (JSFile, 
 		return a.QualifiedName < b.QualifiedName
 	})
 
-	return JSFile{Imports: imports, Symbols: symbols}, nil
+	refs := attributeRefs(symbols, collectCallSites(root, content, tsJS))
+	return JSFile{Imports: imports, Symbols: symbols, References: refs}, nil
 }
 
 // jsLanguage returns the tree-sitter language for the given file.

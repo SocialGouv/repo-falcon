@@ -15,6 +15,7 @@ type JavaFile struct {
 	PackageName string
 	Imports     []string
 	Symbols     []Symbol
+	References  []Reference
 }
 
 // ExtractJavaFile parses a Java file with tree-sitter and extracts
@@ -83,6 +84,7 @@ func ExtractJavaFile(repoRelPath string, content []byte) (JavaFile, error) {
 	})
 
 	out.Symbols = symbols
+	out.References = attributeRefs(symbols, collectCallSites(root, content, tsJava))
 	return out, nil
 }
 

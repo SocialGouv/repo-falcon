@@ -65,6 +65,12 @@ func newIndexCmd() *cobra.Command {
 			var symbolRows []artifacts.SymbolRow
 			var edgeRows []artifacts.EdgeRow
 			packageByID := map[string]artifacts.PackageRow{}
+			// A single unparseable file must never abort the whole index: log a
+			// warning, skip it, and keep going (partial graph beats no graph).
+			skipped := 0
+			// Accumulates symbol defs + call/reference sites across all files;
+			// resolved to symbol->symbol CALLS/REFERENCES edges after the walk.
+			cgb := newCallGraphBuilder()
 
 			// Pre-compute Python top-level package directories.
 			// A directory containing __init__.py is a Python package.
@@ -119,7 +125,9 @@ func newIndexCmd() *cobra.Command {
 				case "go":
 					gof, err := extract.ExtractGoFile(fr.RepoRelPath, fr.Content)
 					if err != nil {
-						return fmt.Errorf("extract go %s: %w", fr.RepoRelPath, err)
+						lg.Warn("extract failed, skipping file", "lang", "go", "file", fr.RepoRelPath, "err", err)
+						skipped++
+						continue
 					}
 					pkgID := graph.NewPackageID("go", gof.PackageName)
 					packageByID[pkgID] = wsPackageRowFor("go", gof.PackageName, true, ws, fr.RepoRelPath)
@@ -133,6 +141,7 @@ func newIndexCmd() *cobra.Command {
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), impID, string(graph.NodeTypePackage)))
 					}
 
+					goQual := map[string]string{}
 					for _, s := range gof.Symbols {
 						q := s.QualifiedName
 						semKey := graph.SymbolKey("go", gof.PackageName, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
@@ -156,16 +165,21 @@ func newIndexCmd() *cobra.Command {
 							Modifiers:         nil,
 							ContainerSymbolID: nil,
 						})
+						goQual[q] = symID
+						cgb.addSymbol(s.Name, symID, gof.PackageName, "go", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
 							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
 						)
 					}
+					cgb.addRefs("go", gof.PackageName, fileID, goQual, gof.References)
 				case "js", "ts":
 					jsf, err := extract.ExtractJSFile(fr.RepoRelPath, fr.Content, fr.Language)
 					if err != nil {
-						return fmt.Errorf("extract js %s: %w", fr.RepoRelPath, err)
+						lg.Warn("extract failed, skipping file", "lang", fr.Language, "file", fr.RepoRelPath, "err", err)
+						skipped++
+						continue
 					}
 
 					// Directory-based package for containment (mirrors Go package containment).
@@ -184,6 +198,7 @@ func newIndexCmd() *cobra.Command {
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
+					jsQual := map[string]string{}
 					for _, s := range jsf.Symbols {
 						q := s.QualifiedName
 						semKey := graph.SymbolKey(fr.Language, dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
@@ -207,16 +222,21 @@ func newIndexCmd() *cobra.Command {
 							Modifiers:         nil,
 							ContainerSymbolID: nil,
 						})
+						jsQual[q] = symID
+						cgb.addSymbol(s.Name, symID, dirPkg, fr.Language, s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
 							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
 						)
 					}
+					cgb.addRefs(fr.Language, dirPkg, fileID, jsQual, jsf.References)
 				case "python":
 					pyf, err := extract.ExtractPythonFile(fr.RepoRelPath, fr.Content)
 					if err != nil {
-						return fmt.Errorf("extract python %s: %w", fr.RepoRelPath, err)
+						lg.Warn("extract failed, skipping file", "lang", "python", "file", fr.RepoRelPath, "err", err)
+						skipped++
+						continue
 					}
 
 					// Directory-based package for containment.
@@ -235,6 +255,7 @@ func newIndexCmd() *cobra.Command {
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
+					pyQual := map[string]string{}
 					for _, s := range pyf.Symbols {
 						q := s.QualifiedName
 						semKey := graph.SymbolKey("python", dirPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
@@ -258,12 +279,15 @@ func newIndexCmd() *cobra.Command {
 							Modifiers:         nil,
 							ContainerSymbolID: nil,
 						})
+						pyQual[q] = symID
+						cgb.addSymbol(s.Name, symID, dirPkg, "python", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
 							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
 						)
 					}
+					cgb.addRefs("python", dirPkg, fileID, pyQual, pyf.References)
 				case "java":
 					// Use pre-parsed result if available (from two-pass).
 					jf, ok := javaExtracts[fr.RepoRelPath]
@@ -271,7 +295,9 @@ func newIndexCmd() *cobra.Command {
 						var jerr error
 						jf, jerr = extract.ExtractJavaFile(fr.RepoRelPath, fr.Content)
 						if jerr != nil {
-							return fmt.Errorf("extract java %s: %w", fr.RepoRelPath, jerr)
+							lg.Warn("extract failed, skipping file", "lang", "java", "file", fr.RepoRelPath, "err", jerr)
+							skipped++
+							continue
 						}
 					}
 
@@ -293,6 +319,7 @@ func newIndexCmd() *cobra.Command {
 						edgeRows = append(edgeRows, edgeRow(graph.EdgeImports, fileID, string(graph.NodeTypeFile), pid, string(graph.NodeTypePackage)))
 					}
 
+					javaQual := map[string]string{}
 					for _, s := range jf.Symbols {
 						q := s.QualifiedName
 						semKey := graph.SymbolKey("java", javaPkg, q, fr.RepoRelPath, s.StartLine, s.StartCol, s.EndLine, s.EndCol)
@@ -316,14 +343,20 @@ func newIndexCmd() *cobra.Command {
 							Modifiers:         nil,
 							ContainerSymbolID: nil,
 						})
+						javaQual[q] = symID
+						cgb.addSymbol(s.Name, symID, javaPkg, "java", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
 							edgeRow(graph.EdgeInFile, symID, string(graph.NodeTypeSymbol), fileID, string(graph.NodeTypeFile)),
 						)
 					}
+					cgb.addRefs("java", javaPkg, fileID, javaQual, jf.References)
 				}
 			}
+
+			// Resolve all captured call/reference sites to symbol->symbol edges.
+			edgeRows = append(edgeRows, cgb.resolveEdges()...)
 
 			packageRows := packagesToSortedSlice(packageByID)
 
@@ -347,7 +380,7 @@ func newIndexCmd() *cobra.Command {
 				return err
 			}
 
-			lg.Info("index complete", "repo", repoRoot, "out", outDir, "files", len(fileRows), "packages", len(packageRows), "symbols", len(symbolRows), "edges", len(edgeRows))
+			lg.Info("index complete", "repo", repoRoot, "out", outDir, "files", len(fileRows), "packages", len(packageRows), "symbols", len(symbolRows), "edges", len(edgeRows), "skipped", skipped)
 			return nil
 		},
 	}
