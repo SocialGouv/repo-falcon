@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"repofalcon/internal/memory"
 )
 
 // HandleToolCall dispatches an MCP tool call to the appropriate handler.
@@ -69,12 +73,47 @@ func HandleToolCall(name string, args map[string]any, s *Server) (string, error)
 		member, _ := args["member"].(string)
 		return s.graph.WorkspaceInfo(member), nil
 
+	case "falcon_remember":
+		return handleRemember(args, s)
+
 	case "falcon_refresh":
 		return handleRefresh(s)
 
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+// handleRemember saves a query outcome into work memory under the snapshot dir.
+func handleRemember(args map[string]any, s *Server) (string, error) {
+	question, _ := args["question"].(string)
+	outcome, _ := args["outcome"].(string)
+	if question == "" || outcome == "" {
+		return "", fmt.Errorf("missing required parameters: question, outcome")
+	}
+	if !memory.ValidOutcome(outcome) {
+		return "", fmt.Errorf("outcome must be one of useful, dead_end, corrected")
+	}
+	var nodes []string
+	if raw, ok := args["nodes"].([]any); ok {
+		for _, n := range raw {
+			if str, ok := n.(string); ok {
+				nodes = append(nodes, str)
+			}
+		}
+	}
+	answer, _ := args["answer"].(string)
+	qType, _ := args["type"].(string)
+	correction, _ := args["correction"].(string)
+	dir := filepath.Join(s.SnapshotDir, "memory")
+	path, err := memory.Save(dir, memory.Record{
+		Question: question, Answer: answer, Type: qType, Nodes: nodes,
+		Outcome: outcome, Correction: correction, Time: time.Now().UTC(),
+	})
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Saved %s outcome to %s. Run `falcon reflect` to distill lessons.", outcome, path), nil
 }
 
 // handleRefresh re-runs index + snapshot on the repo, then reloads the graph.

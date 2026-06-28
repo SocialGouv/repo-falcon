@@ -141,6 +141,23 @@ func AllTools() []ToolDef {
 			},
 		},
 		{
+			Name: "falcon_remember",
+			Description: "Save the outcome of a graph query into work memory (useful/dead_end/corrected) " +
+				"so `falcon reflect` can learn which sources pay off. Call after answering from the graph.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"question":   map[string]any{"type": "string", "description": "The question that was asked"},
+					"answer":     map[string]any{"type": "string", "description": "The answer given"},
+					"type":       map[string]any{"type": "string", "description": "query | path | explain"},
+					"nodes":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Symbol names cited in the answer"},
+					"outcome":    map[string]any{"type": "string", "enum": []string{"useful", "dead_end", "corrected"}, "description": "Outcome signal"},
+					"correction": map[string]any{"type": "string", "description": "The right answer, when outcome is corrected"},
+				},
+				"required": []string{"question", "outcome"},
+			},
+		},
+		{
 			Name:        "falcon_refresh",
 			Description: "Re-index the repository and reload the code knowledge graph. Call this after major refactoring (renamed packages, moved files, changed dependency structure). Not needed for small edits.",
 			InputSchema: map[string]any{
