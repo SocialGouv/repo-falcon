@@ -77,6 +77,57 @@ def b():
 	}
 }
 
+func recvTypeOf(refs []Reference, from, callee string) (string, bool) {
+	for _, r := range refs {
+		if r.FromQualified == from && r.Callee == callee {
+			return r.RecvType, true
+		}
+	}
+	return "", false
+}
+
+func TestJavaReceiverTyping(t *testing.T) {
+	src := []byte(`package p;
+class C {
+    void a() {
+        this.b();
+        D d = new D();
+        d.run();
+    }
+    void b() {}
+}
+`)
+	jf, err := ExtractJavaFile("C.java", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// this.b() -> receiver is the enclosing class C.
+	if rt, ok := recvTypeOf(jf.References, "C.a", "b"); !ok || rt != "C" {
+		t.Errorf("this.b() RecvType = %q (ok=%v), want C", rt, ok)
+	}
+	// d.run() where `D d = new D()` -> receiver typed D.
+	if rt, ok := recvTypeOf(jf.References, "C.a", "run"); !ok || rt != "D" {
+		t.Errorf("d.run() RecvType = %q (ok=%v), want D", rt, ok)
+	}
+}
+
+func TestPythonReceiverTyping(t *testing.T) {
+	src := []byte(`class C:
+    def a(self):
+        self.b()
+
+    def b(self):
+        pass
+`)
+	pf, err := ExtractPythonFile("c.py", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rt, ok := recvTypeOf(pf.References, "C.a", "b"); !ok || rt != "C" {
+		t.Errorf("self.b() RecvType = %q (ok=%v), want C", rt, ok)
+	}
+}
+
 func TestJavaReferences(t *testing.T) {
 	src := []byte(`package p;
 class C {

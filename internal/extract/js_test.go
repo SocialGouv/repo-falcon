@@ -72,15 +72,16 @@ var legacy = true;
 		t.Fatalf("ExtractJSFile error: %v", err)
 	}
 
-	if len(got.Symbols) != 5 {
-		t.Fatalf("expected 5 symbols, got %d: %+v", len(got.Symbols), got.Symbols)
+	if len(got.Symbols) != 6 {
+		t.Fatalf("expected 6 symbols, got %d: %+v", len(got.Symbols), got.Symbols)
 	}
 
 	names := make([]string, len(got.Symbols))
 	for i, s := range got.Symbols {
 		names[i] = s.Kind + ":" + s.Name
 	}
-	wantNames := []string{"function:greet", "class:MyClass", "const:PI", "let:count", "var:legacy"}
+	// Class methods are now captured as symbols too (MyClass.constructor).
+	wantNames := []string{"function:greet", "class:MyClass", "method:constructor", "const:PI", "let:count", "var:legacy"}
 	if !reflect.DeepEqual(names, wantNames) {
 		t.Fatalf("symbol names: got %#v want %#v", names, wantNames)
 	}

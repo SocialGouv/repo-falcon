@@ -84,7 +84,7 @@ func ExtractJavaFile(repoRelPath string, content []byte) (JavaFile, error) {
 	})
 
 	out.Symbols = symbols
-	out.References = attributeRefs(symbols, collectCallSites(root, content, tsJava))
+	out.References = collectRefs(root, content, tsJava, symbols)
 	return out, nil
 }
 

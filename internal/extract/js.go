@@ -96,7 +96,7 @@ func ExtractJSFile(repoRelPath string, content []byte, langTag string) (JSFile, 
 		return a.QualifiedName < b.QualifiedName
 	})
 
-	refs := attributeRefs(symbols, collectCallSites(root, content, tsJS))
+	refs := collectRefs(root, content, tsJS, symbols)
 	return JSFile{Imports: imports, Symbols: symbols, References: refs}, nil
 }
 
@@ -162,7 +162,9 @@ func extractDecl(node *sitter.Node, content []byte, langTag string) []Symbol {
 		if name == "" {
 			return nil
 		}
-		return []Symbol{symbolFromNode(node, "class", name, langTag)}
+		out := []Symbol{symbolFromNode(node, "class", name, langTag)}
+		out = append(out, jsClassMethods(node, name, content, langTag)...)
+		return out
 
 	case "lexical_declaration":
 		return extractVariableDeclarators(node, content, langTag)
@@ -173,6 +175,30 @@ func extractDecl(node *sitter.Node, content []byte, langTag string) []Symbol {
 	default:
 		return nil
 	}
+}
+
+// jsClassMethods extracts method definitions inside a class as symbols
+// qualified `Class.method`, so method calls can resolve to a concrete target.
+func jsClassMethods(classNode *sitter.Node, className string, content []byte, langTag string) []Symbol {
+	body := classNode.ChildByFieldName("body")
+	if body == nil {
+		return nil
+	}
+	var out []Symbol
+	for i := 0; i < int(body.ChildCount()); i++ {
+		m := body.Child(i)
+		if m == nil || m.Type() != "method_definition" {
+			continue
+		}
+		name := nodeIdentifier(m, "name", content)
+		if name == "" {
+			continue
+		}
+		sym := symbolFromNode(m, "method", name, langTag)
+		sym.QualifiedName = className + "." + name
+		out = append(out, sym)
+	}
+	return out
 }
 
 // extractVariableDeclarators extracts symbols from variable_declarator children.

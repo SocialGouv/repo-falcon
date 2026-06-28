@@ -59,6 +59,7 @@ func ExtractPythonFile(repoRelPath string, content []byte) (PythonFile, error) {
 		case "class_definition":
 			if name := nodeIdentifier(child, "name", content); name != "" {
 				symbols = append(symbols, symbolFromNode(child, "class", name, "python"))
+				symbols = append(symbols, pyClassMethods(child, name, content)...)
 			}
 
 		case "decorated_definition":
@@ -98,8 +99,39 @@ func ExtractPythonFile(repoRelPath string, content []byte) (PythonFile, error) {
 		return a.QualifiedName < b.QualifiedName
 	})
 
-	refs := attributeRefs(symbols, collectCallSites(root, content, tsPython))
+	refs := collectRefs(root, content, tsPython, symbols)
 	return PythonFile{Imports: imports, Symbols: symbols, References: refs}, nil
+}
+
+// pyClassMethods extracts methods defined in a class body as symbols qualified
+// `Class.method`, so `self.m()` / instance calls can resolve to a target.
+func pyClassMethods(classNode *sitter.Node, className string, content []byte) []Symbol {
+	body := classNode.ChildByFieldName("body")
+	if body == nil {
+		return nil
+	}
+	var out []Symbol
+	for i := 0; i < int(body.ChildCount()); i++ {
+		m := body.Child(i)
+		if m == nil {
+			continue
+		}
+		defn := m
+		if m.Type() == "decorated_definition" {
+			defn = m.ChildByFieldName("definition")
+		}
+		if defn == nil || defn.Type() != "function_definition" {
+			continue
+		}
+		name := nodeIdentifier(defn, "name", content)
+		if name == "" {
+			continue
+		}
+		sym := symbolFromNode(m, "method", name, "python")
+		sym.QualifiedName = className + "." + name
+		out = append(out, sym)
+	}
+	return out
 }
 
 // pyExtractImportStatement handles:
