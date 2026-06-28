@@ -80,6 +80,27 @@ func newCommunitiesCmd() *cobra.Command {
 	return cmd
 }
 
+// newBenchmarkCmd: `falcon benchmark` — estimated token reduction vs raw corpus.
+func newBenchmarkCmd() *cobra.Command {
+	var snapshot string
+	cmd := &cobra.Command{
+		Use:   "benchmark",
+		Short: "Estimate token reduction of graph queries vs reading the raw corpus",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			g, err := mcp.LoadGraph(context.Background(), snapshot)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), g.Benchmark())
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&snapshot, "snapshot", ".falcon/artifacts", "path to snapshot artifacts directory")
+	cmd.Example = "falcon benchmark"
+	return cmd
+}
+
 // newInsightsCmd: `falcon insights` — surprising cross-cluster connections +
 // suggested questions (deterministic).
 func newInsightsCmd() *cobra.Command {

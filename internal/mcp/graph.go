@@ -531,6 +531,68 @@ func (g *GraphIndex) CommunitiesWithLabels(maxShow int, labels map[string]string
 	return b.String()
 }
 
+// Benchmark estimates the token reduction of querying the graph versus reading
+// the raw corpus. Naive cost = whole corpus in context; graph cost = a typical
+// symbol lookup. Tokens are approximated at ~4 chars/token (deterministic).
+func (g *GraphIndex) Benchmark() string {
+	const charsPerToken = 4
+	var corpusBytes int64
+	for _, f := range g.Files {
+		corpusBytes += f.SizeBytes
+	}
+	corpusTokens := corpusBytes / charsPerToken
+
+	// Sample the most-connected symbols (representative, hottest queries).
+	deg := map[string]int{}
+	for _, e := range g.Edges {
+		if symbolEdgeType(e) == "" {
+			continue
+		}
+		deg[e.SrcID]++
+		deg[e.DstID]++
+	}
+	type hd struct {
+		id  string
+		deg int
+	}
+	var hubs []hd
+	for id, d := range deg {
+		hubs = append(hubs, hd{id, d})
+	}
+	sort.Slice(hubs, func(i, j int) bool {
+		if hubs[i].deg != hubs[j].deg {
+			return hubs[i].deg > hubs[j].deg
+		}
+		return hubs[i].id < hubs[j].id
+	})
+	sample := 10
+	if sample > len(hubs) {
+		sample = len(hubs)
+	}
+	var totalQ int
+	for i := 0; i < sample; i++ {
+		s := g.SymByID[hubs[i].id]
+		totalQ += len(g.SymbolLookup(s.Name, ""))
+	}
+	avgQueryTokens := int64(1)
+	if sample > 0 {
+		avgQueryTokens = int64(totalQ) / int64(sample) / charsPerToken
+		if avgQueryTokens < 1 {
+			avgQueryTokens = 1
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("# Token Benchmark\n\n")
+	fmt.Fprintf(&b, "- Corpus: %d files, ~%d tokens (naive full-context)\n", len(g.Files), corpusTokens)
+	fmt.Fprintf(&b, "- Graph: %d symbols, %d edges\n", len(g.Symbols), len(g.Edges))
+	fmt.Fprintf(&b, "- Avg query cost: ~%d tokens (symbol lookup, %d-symbol sample)\n", avgQueryTokens, sample)
+	if avgQueryTokens > 0 {
+		fmt.Fprintf(&b, "- Reduction: %.1fx fewer tokens per query\n", float64(corpusTokens)/float64(avgQueryTokens))
+	}
+	return b.String()
+}
+
 // Insights surfaces non-obvious structure: "surprising connections" (lone edges
 // bridging two otherwise-separate communities) and "suggested questions" (seeded
 // from hubs and bridges). Deterministic, no LLM.

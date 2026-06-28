@@ -141,6 +141,11 @@ func AllTools() []ToolDef {
 			},
 		},
 		{
+			Name:        "falcon_benchmark",
+			Description: "Estimate token reduction of querying the graph versus reading the raw corpus.",
+			InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
 			Name:        "falcon_insights",
 			Description: "Surface non-obvious structure: surprising cross-cluster connections and suggested questions about the codebase.",
 			InputSchema: map[string]any{
