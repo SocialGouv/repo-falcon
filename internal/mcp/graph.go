@@ -448,56 +448,34 @@ type Community struct {
 // iterated in sorted order, the result is fully reproducible. Returned sorted by
 // size desc, then representative.
 func (g *GraphIndex) ComputeCommunities() []Community {
-	adj := map[string][]string{}
+	// Weighted, symmetric adjacency over symbol CALLS/REFERENCES edges (parallel
+	// edges accumulate weight) + degree for choosing representatives.
+	adj := map[string]map[string]float64{}
 	deg := map[string]int{}
+	addEdge := func(a, b string) {
+		if adj[a] == nil {
+			adj[a] = map[string]float64{}
+		}
+		adj[a][b]++
+	}
 	for _, e := range g.Edges {
 		if symbolEdgeType(e) == "" || e.SrcID == e.DstID {
 			continue
 		}
-		adj[e.SrcID] = append(adj[e.SrcID], e.DstID)
-		adj[e.DstID] = append(adj[e.DstID], e.SrcID)
+		addEdge(e.SrcID, e.DstID)
+		addEdge(e.DstID, e.SrcID)
 		deg[e.SrcID]++
 		deg[e.DstID]++
 	}
-	ids := make([]string, 0, len(adj))
-	for id := range adj {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 
-	label := make(map[string]string, len(ids))
-	for _, id := range ids {
-		label[id] = id
-	}
-	for iter := 0; iter < 10; iter++ {
-		changed := false
-		for _, id := range ids {
-			freq := map[string]int{}
-			for _, nb := range adj[id] {
-				freq[label[nb]]++
-			}
-			best, bestN := label[id], -1
-			for lbl, n := range freq {
-				if n > bestN || (n == bestN && lbl < best) {
-					best, bestN = lbl, n
-				}
-			}
-			if best != label[id] {
-				label[id] = best
-				changed = true
-			}
-		}
-		if !changed {
-			break
-		}
-	}
-
-	groups := map[string][]string{}
-	for _, id := range ids {
-		groups[label[id]] = append(groups[label[id]], id)
+	label := louvain(adj)
+	groups := map[int][]string{}
+	for id, c := range label {
+		groups[c] = append(groups[c], id)
 	}
 	var comms []Community
 	for _, members := range groups {
+		sort.Strings(members)
 		c := Community{Members: members}
 		repDeg := -1
 		for _, m := range members {
