@@ -166,7 +166,7 @@ func newIndexCmd() *cobra.Command {
 							ContainerSymbolID: nil,
 						})
 						goQual[q] = symID
-						cgb.addSymbol(s.Name, symID, gof.PackageName, "go", s.Kind)
+						cgb.addSymbol(s.Name, q, symID, gof.PackageName, "go", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
@@ -223,7 +223,7 @@ func newIndexCmd() *cobra.Command {
 							ContainerSymbolID: nil,
 						})
 						jsQual[q] = symID
-						cgb.addSymbol(s.Name, symID, dirPkg, fr.Language, s.Kind)
+						cgb.addSymbol(s.Name, q, symID, dirPkg, fr.Language, s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
@@ -280,7 +280,7 @@ func newIndexCmd() *cobra.Command {
 							ContainerSymbolID: nil,
 						})
 						pyQual[q] = symID
-						cgb.addSymbol(s.Name, symID, dirPkg, "python", s.Kind)
+						cgb.addSymbol(s.Name, q, symID, dirPkg, "python", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),
@@ -344,7 +344,7 @@ func newIndexCmd() *cobra.Command {
 							ContainerSymbolID: nil,
 						})
 						javaQual[q] = symID
-						cgb.addSymbol(s.Name, symID, javaPkg, "java", s.Kind)
+						cgb.addSymbol(s.Name, q, symID, javaPkg, "java", s.Kind)
 
 						edgeRows = append(edgeRows,
 							edgeRow(graph.EdgeDefines, fileID, string(graph.NodeTypeFile), symID, string(graph.NodeTypeSymbol)),

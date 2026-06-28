@@ -33,6 +33,7 @@ type Reference struct {
 	FromQualified string // qualified name of the enclosing symbol
 	Callee        string // simple name being called/referenced
 	Qualifier     string // optional receiver/module qualifier (e.g. pkg alias)
+	RecvType      string // resolved receiver type for a method call (e.g. "T" in x.M() when x: T)
 	Kind          string // "call" or "reference"
 	Line          int
 	Col           int

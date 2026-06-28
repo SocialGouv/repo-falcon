@@ -9,10 +9,10 @@ import (
 func TestCallGraphResolver(t *testing.T) {
 	b := newCallGraphBuilder()
 	// Two packages, each with a "Helper" func, plus a unique "OnlyOne".
-	b.addSymbol("Helper", "sym:pkgA.Helper", "pkgA", "go", "func")
-	b.addSymbol("Helper", "sym:pkgB.Helper", "pkgB", "go", "func")
-	b.addSymbol("OnlyOne", "sym:pkgB.OnlyOne", "pkgB", "go", "func")
-	b.addSymbol("Caller", "sym:pkgA.Caller", "pkgA", "go", "func")
+	b.addSymbol("Helper", "Helper", "sym:pkgA.Helper", "pkgA", "go", "func")
+	b.addSymbol("Helper", "Helper", "sym:pkgB.Helper", "pkgB", "go", "func")
+	b.addSymbol("OnlyOne", "OnlyOne", "sym:pkgB.OnlyOne", "pkgB", "go", "func")
+	b.addSymbol("Caller", "Caller", "sym:pkgA.Caller", "pkgA", "go", "func")
 
 	b.addRefs("go", "pkgA", "file:a", map[string]string{"Caller": "sym:pkgA.Caller"}, []extract.Reference{
 		{FromQualified: "Caller", Callee: "Helper", Kind: "call"},   // same-pkg unique -> pkgA.Helper @1.0
@@ -48,13 +48,44 @@ func TestCallGraphResolver(t *testing.T) {
 func TestCallGraphAmbiguousDropped(t *testing.T) {
 	b := newCallGraphBuilder()
 	// "Amb" defined in two non-caller packages -> ambiguous global -> dropped.
-	b.addSymbol("Amb", "sym:x.Amb", "x", "go", "func")
-	b.addSymbol("Amb", "sym:y.Amb", "y", "go", "func")
-	b.addSymbol("Caller", "sym:z.Caller", "z", "go", "func")
+	b.addSymbol("Amb", "Amb", "sym:x.Amb", "x", "go", "func")
+	b.addSymbol("Amb", "Amb", "sym:y.Amb", "y", "go", "func")
+	b.addSymbol("Caller", "Caller", "sym:z.Caller", "z", "go", "func")
 	b.addRefs("go", "z", "file:z", map[string]string{"Caller": "sym:z.Caller"}, []extract.Reference{
 		{FromQualified: "Caller", Callee: "Amb", Kind: "call"},
 	})
 	if edges := b.resolveEdges(); len(edges) != 0 {
 		t.Errorf("ambiguous call must be dropped, got %d edges", len(edges))
+	}
+}
+
+func TestCallGraphReceiverTyping(t *testing.T) {
+	b := newCallGraphBuilder()
+	// Two distinct types each with a method "Run"; a bare-name resolver would
+	// see "Run" as ambiguous and drop it. Receiver typing disambiguates.
+	b.addSymbol("Run", "A.Run", "sym:p.A.Run", "p", "go", "method")
+	b.addSymbol("Run", "B.Run", "sym:p.B.Run", "p", "go", "method")
+	b.addSymbol("Caller", "Caller", "sym:p.Caller", "p", "go", "func")
+	b.addRefs("go", "p", "file:p", map[string]string{"Caller": "sym:p.Caller"}, []extract.Reference{
+		{FromQualified: "Caller", Callee: "Run", RecvType: "B", Kind: "call"},
+	})
+	edges := b.resolveEdges()
+	if len(edges) != 1 || edges[0].DstID != "sym:p.B.Run" {
+		t.Fatalf("receiver typing should resolve to B.Run, got %+v", edges)
+	}
+}
+
+func TestCallGraphTypeReference(t *testing.T) {
+	b := newCallGraphBuilder()
+	// A "reference" must resolve to a type symbol, not a like-named function.
+	b.addSymbol("Config", "Config", "sym:p.Config.fn", "p", "go", "func")
+	b.addSymbol("Config", "Config", "sym:p.Config.type", "p", "go", "type")
+	b.addSymbol("User", "User", "sym:p.User", "p", "go", "func")
+	b.addRefs("go", "p", "file:p", map[string]string{"User": "sym:p.User"}, []extract.Reference{
+		{FromQualified: "User", Callee: "Config", Kind: "reference"},
+	})
+	edges := b.resolveEdges()
+	if len(edges) != 1 || edges[0].EdgeType != "REFERENCES" || edges[0].DstID != "sym:p.Config.type" {
+		t.Fatalf("reference should resolve to the type symbol, got %+v", edges)
 	}
 }
