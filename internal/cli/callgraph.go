@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"sort"
 
 	"repofalcon/internal/artifacts"
@@ -110,77 +111,116 @@ func (b *callGraphBuilder) resolveEdges() []artifacts.EdgeRow {
 			edgeType = graph.EdgeReferences
 		}
 
-		var target string
-		var confidence float32
-
-		// Receiver-typed method call: resolve directly to RecvType.Callee.
-		if r.kind == "call" && r.recvType != "" {
-			if t, c, ok := resolveQualified(b.byQualified[r.recvType+"."+r.callee], r.lang, r.callerSymID, r.callerPkg); ok {
-				target, confidence = t, c
-			}
-		}
-
-		if target == "" {
-			cands := b.byName[r.callee]
-			if len(cands) == 0 {
+		for _, res := range b.resolve(r) {
+			edgeID := graph.NewEdgeID(r.callerSymID, res.target, edgeType, "")
+			if _, dup := seen[edgeID]; dup {
 				continue
 			}
-			// Filter to same-language, non-self candidates, preferring the kind
-			// appropriate to the relation (callable for calls, type for refs).
-			var preferred, any []symCandidate
-			for _, c := range cands {
-				if c.lang != r.lang || c.symID == r.callerSymID {
-					continue
-				}
-				any = append(any, c)
-				if (r.kind == "reference" && typeKind(c.kind)) || (r.kind == "call" && callableKind(c.kind)) {
-					preferred = append(preferred, c)
-				}
-			}
-			pool := preferred
-			if len(pool) == 0 {
-				pool = any
-			}
-			if len(pool) == 0 {
-				continue
-			}
-			t, c, ok := pickTarget(pool, r.callerPkg)
-			if !ok {
-				continue
-			}
-			target, confidence = t, c
-		}
+			seen[edgeID] = struct{}{}
 
-		edgeID := graph.NewEdgeID(r.callerSymID, target, edgeType, "")
-		if _, dup := seen[edgeID]; dup {
-			continue
+			conf := res.conf
+			fileID := r.fileID
+			line := int32(r.line)
+			props := fmt.Sprintf(`{"confidence_label":%q}`, res.label)
+			out = append(out, artifacts.EdgeRow{
+				EdgeID:         edgeID,
+				EdgeType:       string(edgeType),
+				SrcID:          r.callerSymID,
+				DstID:          res.target,
+				SrcType:        string(graph.NodeTypeSymbol),
+				DstType:        string(graph.NodeTypeSymbol),
+				SiteFileID:     &fileID,
+				SiteStartLine:  &line,
+				Confidence:     &conf,
+				PropertiesJSON: &props,
+			})
 		}
-		seen[edgeID] = struct{}{}
-
-		conf := confidence
-		fileID := r.fileID
-		line := int32(r.line)
-		out = append(out, artifacts.EdgeRow{
-			EdgeID:        edgeID,
-			EdgeType:      string(edgeType),
-			SrcID:         r.callerSymID,
-			DstID:         target,
-			SrcType:       string(graph.NodeTypeSymbol),
-			DstType:       string(graph.NodeTypeSymbol),
-			SiteFileID:    &fileID,
-			SiteStartLine: &line,
-			Confidence:    &conf,
-		})
 	}
 
 	sort.SliceStable(out, func(i, j int) bool { return out[i].EdgeID < out[j].EdgeID })
 	return out
 }
 
-// resolveQualified resolves a receiver-typed method call against candidates
-// already keyed by the exact "Type.method" qualified name — a strong signal, so
-// confidence is high: same-package unique (1.0), else repo-wide unique (0.9).
-func resolveQualified(cands []symCandidate, lang, callerSymID, callerPkg string) (string, float32, bool) {
+// Confidence rubric (mirrors graphify's EXTRACTED / INFERRED / AMBIGUOUS), carried
+// on each edge as Confidence + a confidence_label in PropertiesJSON:
+//   - EXTRACTED 1.0  — unambiguous: receiver-typed Type.method, or a unique
+//     same-package name match (essentially certain in a single package).
+//   - INFERRED  0.9  — receiver-typed but resolved repo-wide (unique).
+//   - INFERRED  0.75 — unique repo-wide name match (no same-package candidate).
+//   - AMBIGUOUS 0.5  — a few plausible targets and no way to choose; emitted to
+//     ALL of them (bounded fan-out) and flagged, rather than silently dropped.
+const (
+	labelExtracted     = "EXTRACTED"
+	labelInferred      = "INFERRED"
+	labelAmbiguous     = "AMBIGUOUS"
+	confExtracted      = 1.0
+	confInferredRecv   = 0.9
+	confInferredGlobal = 0.75
+	confAmbiguous      = 0.5
+	ambiguousFanoutMax = 4 // above this a name is too ambiguous to be useful
+)
+
+type resolution struct {
+	target string
+	conf   float32
+	label  string
+}
+
+// resolve turns one use-site into zero or more edges per the confidence rubric.
+func (b *callGraphBuilder) resolve(r pendingRef) []resolution {
+	// Receiver-typed method call: resolve directly to RecvType.Callee.
+	if r.kind == "call" && r.recvType != "" {
+		if res, ok := resolveUnique(b.byQualified[r.recvType+"."+r.callee], r.lang, r.callerSymID, r.callerPkg, confExtracted, confInferredRecv); ok {
+			return []resolution{res}
+		}
+	}
+
+	cands := b.byName[r.callee]
+	if len(cands) == 0 {
+		return nil
+	}
+	// Same-language, non-self; prefer the kind matching the relation.
+	var preferred, any []symCandidate
+	for _, c := range cands {
+		if c.lang != r.lang || c.symID == r.callerSymID {
+			continue
+		}
+		any = append(any, c)
+		if (r.kind == "reference" && typeKind(c.kind)) || (r.kind == "call" && callableKind(c.kind)) {
+			preferred = append(preferred, c)
+		}
+	}
+	pool := preferred
+	if len(pool) == 0 {
+		pool = any
+	}
+	if len(pool) == 0 {
+		return nil
+	}
+
+	if res, ok := resolveUnique(pool, r.lang, r.callerSymID, r.callerPkg, confExtracted, confInferredGlobal); ok {
+		return []resolution{res}
+	}
+
+	// Ambiguous: a few candidates, no disambiguation. Emit them all, flagged,
+	// when the fan-out is small enough to be useful; otherwise drop.
+	amb := samePackage(pool, r.callerPkg)
+	if len(amb) == 0 {
+		amb = pool
+	}
+	if len(amb) < 2 || len(amb) > ambiguousFanoutMax {
+		return nil
+	}
+	out := make([]resolution, 0, len(amb))
+	for _, c := range amb {
+		out = append(out, resolution{target: c.symID, conf: confAmbiguous, label: labelAmbiguous})
+	}
+	return out
+}
+
+// resolveUnique returns a single high-confidence resolution: a unique
+// same-package match (samePkgConf), else a unique repo-wide match (globalConf).
+func resolveUnique(cands []symCandidate, lang, callerSymID, callerPkg string, samePkgConf, globalConf float32) (resolution, bool) {
 	var pool []symCandidate
 	for _, c := range cands {
 		if c.lang == lang && c.symID != callerSymID {
@@ -188,37 +228,22 @@ func resolveQualified(cands []symCandidate, lang, callerSymID, callerPkg string)
 		}
 	}
 	if len(pool) == 0 {
-		return "", 0, false
+		return resolution{}, false
 	}
-	var samePkg []symCandidate
-	for _, c := range pool {
-		if c.pkg == callerPkg {
-			samePkg = append(samePkg, c)
-		}
+	if sp := samePackage(pool, callerPkg); len(sp) == 1 {
+		return resolution{target: sp[0].symID, conf: samePkgConf, label: labelExtracted}, true
+	} else if len(sp) == 0 && len(pool) == 1 {
+		return resolution{target: pool[0].symID, conf: globalConf, label: labelInferred}, true
 	}
-	if len(samePkg) == 1 {
-		return samePkg[0].symID, 1.0, true
-	}
-	if len(samePkg) == 0 && len(pool) == 1 {
-		return pool[0].symID, 0.9, true
-	}
-	return "", 0, false
+	return resolution{}, false
 }
 
-// pickTarget selects the best resolution: unique same-package (1.0), else unique
-// repo-wide (0.7); ambiguous → no edge.
-func pickTarget(pool []symCandidate, callerPkg string) (string, float32, bool) {
-	var samePkg []symCandidate
+func samePackage(pool []symCandidate, callerPkg string) []symCandidate {
+	var out []symCandidate
 	for _, c := range pool {
 		if c.pkg == callerPkg {
-			samePkg = append(samePkg, c)
+			out = append(out, c)
 		}
 	}
-	if len(samePkg) == 1 {
-		return samePkg[0].symID, 1.0, true
-	}
-	if len(samePkg) == 0 && len(pool) == 1 {
-		return pool[0].symID, 0.7, true
-	}
-	return "", 0, false
+	return out
 }

@@ -233,11 +233,11 @@ func (g *GraphIndex) SymbolLookup(name string, kind string) string {
 			switch e.EdgeType {
 			case "CALLS":
 				if t, ok := g.SymByID[e.DstID]; ok {
-					calls = append(calls, t.QualifiedName)
+					calls = append(calls, edgeLabel(t.QualifiedName, e))
 				}
 			case "REFERENCES":
 				if t, ok := g.SymByID[e.DstID]; ok {
-					refs = append(refs, t.QualifiedName)
+					refs = append(refs, edgeLabel(t.QualifiedName, e))
 				}
 			}
 		}
@@ -245,11 +245,11 @@ func (g *GraphIndex) SymbolLookup(name string, kind string) string {
 			switch e.EdgeType {
 			case "CALLS":
 				if t, ok := g.SymByID[e.SrcID]; ok {
-					calledBy = append(calledBy, t.QualifiedName)
+					calledBy = append(calledBy, edgeLabel(t.QualifiedName, e))
 				}
 			case "REFERENCES":
 				if t, ok := g.SymByID[e.SrcID]; ok {
-					referencedBy = append(referencedBy, t.QualifiedName)
+					referencedBy = append(referencedBy, edgeLabel(t.QualifiedName, e))
 				}
 			}
 		}
@@ -302,6 +302,15 @@ func (g *GraphIndex) resolveSymbol(name string) (artifacts.SymbolRow, bool) {
 
 // symbolEdgeType reports the relation if e connects two symbols (CALLS or
 // REFERENCES), else "".
+// edgeLabel renders a related symbol's name, marking low-confidence (ambiguous)
+// edges with a trailing " (?)" so callers can tell certain from uncertain links.
+func edgeLabel(name string, e artifacts.EdgeRow) string {
+	if e.Confidence != nil && *e.Confidence < 0.6 {
+		return name + " (?)"
+	}
+	return name
+}
+
 func symbolEdgeType(e artifacts.EdgeRow) string {
 	if strings.EqualFold(e.SrcType, "symbol") && strings.EqualFold(e.DstType, "symbol") &&
 		(e.EdgeType == "CALLS" || e.EdgeType == "REFERENCES") {

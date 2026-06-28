@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"repofalcon/internal/extract"
@@ -37,25 +38,50 @@ func TestCallGraphResolver(t *testing.T) {
 	if _, ok := got["sym:pkgB.Helper"]; ok {
 		t.Error("must not resolve cross-pkg when a same-pkg match exists")
 	}
-	if c, ok := got["sym:pkgB.OnlyOne"]; !ok || c != 0.7 {
-		t.Errorf("OnlyOne should resolve globally @0.7, got %v ok=%v", c, ok)
+	if c, ok := got["sym:pkgB.OnlyOne"]; !ok || c != 0.75 {
+		t.Errorf("OnlyOne should resolve globally @0.75, got %v ok=%v", c, ok)
 	}
 	if len(edges) != 2 {
 		t.Errorf("expected exactly 2 resolved edges, got %d", len(edges))
 	}
 }
 
-func TestCallGraphAmbiguousDropped(t *testing.T) {
+func TestCallGraphAmbiguousFanout(t *testing.T) {
+	// A small ambiguity (2 candidates, none in caller's pkg) is emitted to both,
+	// flagged AMBIGUOUS @0.5, rather than silently dropped.
 	b := newCallGraphBuilder()
-	// "Amb" defined in two non-caller packages -> ambiguous global -> dropped.
 	b.addSymbol("Amb", "Amb", "sym:x.Amb", "x", "go", "func")
 	b.addSymbol("Amb", "Amb", "sym:y.Amb", "y", "go", "func")
 	b.addSymbol("Caller", "Caller", "sym:z.Caller", "z", "go", "func")
 	b.addRefs("go", "z", "file:z", map[string]string{"Caller": "sym:z.Caller"}, []extract.Reference{
 		{FromQualified: "Caller", Callee: "Amb", Kind: "call"},
 	})
+	edges := b.resolveEdges()
+	if len(edges) != 2 {
+		t.Fatalf("small ambiguity should fan out to 2 flagged edges, got %d", len(edges))
+	}
+	for _, e := range edges {
+		if e.Confidence == nil || *e.Confidence != 0.5 {
+			t.Errorf("ambiguous edge should be @0.5, got %v", e.Confidence)
+		}
+		if e.PropertiesJSON == nil || !strings.Contains(*e.PropertiesJSON, "AMBIGUOUS") {
+			t.Errorf("ambiguous edge should be flagged AMBIGUOUS, got %v", e.PropertiesJSON)
+		}
+	}
+}
+
+func TestCallGraphTooAmbiguousDropped(t *testing.T) {
+	// Beyond the fan-out cap, a name is too ambiguous to be useful -> dropped.
+	b := newCallGraphBuilder()
+	for _, p := range []string{"a", "b", "c", "d", "e"} {
+		b.addSymbol("Wide", "Wide", "sym:"+p+".Wide", p, "go", "func")
+	}
+	b.addSymbol("Caller", "Caller", "sym:z.Caller", "z", "go", "func")
+	b.addRefs("go", "z", "file:z", map[string]string{"Caller": "sym:z.Caller"}, []extract.Reference{
+		{FromQualified: "Caller", Callee: "Wide", Kind: "call"},
+	})
 	if edges := b.resolveEdges(); len(edges) != 0 {
-		t.Errorf("ambiguous call must be dropped, got %d edges", len(edges))
+		t.Errorf("over-cap ambiguity must be dropped, got %d edges", len(edges))
 	}
 }
 
