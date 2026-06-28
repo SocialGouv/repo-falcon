@@ -80,6 +80,30 @@ func newCommunitiesCmd() *cobra.Command {
 	return cmd
 }
 
+// newInsightsCmd: `falcon insights` — surprising cross-cluster connections +
+// suggested questions (deterministic).
+func newInsightsCmd() *cobra.Command {
+	var snapshot string
+	var top int
+	cmd := &cobra.Command{
+		Use:   "insights",
+		Short: "Surprising connections + suggested questions about the codebase",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			g, err := mcp.LoadGraph(context.Background(), snapshot)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), g.Insights(top))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&snapshot, "snapshot", ".falcon/artifacts", "path to snapshot artifacts directory")
+	cmd.Flags().IntVar(&top, "top", 10, "number of surprising connections to show")
+	cmd.Example = "falcon insights"
+	return cmd
+}
+
 // newHubsCmd: `falcon hubs` — most connected symbols (degree centrality).
 func newHubsCmd() *cobra.Command {
 	var snapshot string

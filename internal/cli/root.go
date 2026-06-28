@@ -54,6 +54,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newSymbolCmd())
 	cmd.AddCommand(newPathCmd())
 	cmd.AddCommand(newHubsCmd())
+	cmd.AddCommand(newInsightsCmd())
 	cmd.AddCommand(newCommunitiesCmd())
 	cmd.AddCommand(newLabelCmd())
 	cmd.AddCommand(newRememberCmd())

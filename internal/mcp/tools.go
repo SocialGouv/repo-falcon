@@ -141,6 +141,16 @@ func AllTools() []ToolDef {
 			},
 		},
 		{
+			Name:        "falcon_insights",
+			Description: "Surface non-obvious structure: surprising cross-cluster connections and suggested questions about the codebase.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"top": map[string]any{"type": "number", "description": "How many surprising connections to return (default 10)"},
+				},
+			},
+		},
+		{
 			Name: "falcon_remember",
 			Description: "Save the outcome of a graph query into work memory (useful/dead_end/corrected) " +
 				"so `falcon reflect` can learn which sources pay off. Call after answering from the graph.",

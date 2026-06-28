@@ -531,6 +531,121 @@ func (g *GraphIndex) CommunitiesWithLabels(maxShow int, labels map[string]string
 	return b.String()
 }
 
+// Insights surfaces non-obvious structure: "surprising connections" (lone edges
+// bridging two otherwise-separate communities) and "suggested questions" (seeded
+// from hubs and bridges). Deterministic, no LLM.
+func (g *GraphIndex) Insights(top int) string {
+	if top <= 0 {
+		top = 10
+	}
+	comms := g.ComputeCommunities()
+	commOf := map[string]int{}
+	size := map[int]int{}
+	core := map[int]string{}
+	for i, c := range comms {
+		size[i] = len(c.Members)
+		core[i] = c.RepLabel
+		for _, m := range c.Members {
+			commOf[m] = i
+		}
+	}
+	deg := map[string]int{}
+	for _, e := range g.Edges {
+		if symbolEdgeType(e) == "" {
+			continue
+		}
+		deg[e.SrcID]++
+		deg[e.DstID]++
+	}
+
+	type pair struct{ a, b int }
+	count := map[pair]int{}
+	example := map[pair][2]string{}
+	for _, e := range g.Edges {
+		if symbolEdgeType(e) == "" {
+			continue
+		}
+		ca, oka := commOf[e.SrcID]
+		cb, okb := commOf[e.DstID]
+		if !oka || !okb || ca == cb {
+			continue
+		}
+		p := pair{ca, cb}
+		if p.a > p.b {
+			p.a, p.b = p.b, p.a
+		}
+		count[p]++
+		if _, ok := example[p]; !ok {
+			example[p] = [2]string{e.SrcID, e.DstID}
+		}
+	}
+
+	type bridge struct {
+		p     pair
+		score float64
+		ex    [2]string
+	}
+	var bridges []bridge
+	for p, c := range count {
+		// A few links between two large communities = a surprising bridge.
+		s := float64(size[p.a]+size[p.b]) / float64(c)
+		bridges = append(bridges, bridge{p, s, example[p]})
+	}
+	sort.Slice(bridges, func(i, j int) bool {
+		if bridges[i].score != bridges[j].score {
+			return bridges[i].score > bridges[j].score
+		}
+		// Deterministic tie-break.
+		return core[bridges[i].p.a]+core[bridges[i].p.b] < core[bridges[j].p.a]+core[bridges[j].p.b]
+	})
+
+	var b strings.Builder
+	b.WriteString("# Insights\n\n## Surprising connections\n\n")
+	b.WriteString("_lone links bridging otherwise-separate clusters_\n\n")
+	n := top
+	if n > len(bridges) {
+		n = len(bridges)
+	}
+	for i := 0; i < n; i++ {
+		br := bridges[i]
+		fmt.Fprintf(&b, "- `%s` ↔ `%s` (%d link(s); e.g. `%s` → `%s`)\n",
+			core[br.p.a], core[br.p.b], count[br.p], g.symLabel(br.ex[0]), g.symLabel(br.ex[1]))
+	}
+
+	// Hubs for question seeding.
+	type hd struct {
+		id  string
+		deg int
+	}
+	var hubs []hd
+	for id, d := range deg {
+		hubs = append(hubs, hd{id, d})
+	}
+	sort.Slice(hubs, func(i, j int) bool {
+		if hubs[i].deg != hubs[j].deg {
+			return hubs[i].deg > hubs[j].deg
+		}
+		return hubs[i].id < hubs[j].id
+	})
+
+	b.WriteString("\n## Suggested questions\n\n")
+	qn := 5
+	if qn > len(hubs) {
+		qn = len(hubs)
+	}
+	for i := 0; i < qn; i++ {
+		fmt.Fprintf(&b, "- How does `%s` work, and what calls it?\n", g.symLabel(hubs[i].id))
+	}
+	bn := 3
+	if bn > len(bridges) {
+		bn = len(bridges)
+	}
+	for i := 0; i < bn; i++ {
+		fmt.Fprintf(&b, "- What connects `%s` to `%s`?\n", core[bridges[i].p.a], core[bridges[i].p.b])
+	}
+	return b.String()
+}
+
 // PackageInfo returns a summary for a package by name.
 func (g *GraphIndex) PackageInfo(name string) string {
 	pkg, ok := g.PkgByName[name]

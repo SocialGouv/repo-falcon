@@ -73,6 +73,13 @@ func HandleToolCall(name string, args map[string]any, s *Server) (string, error)
 		member, _ := args["member"].(string)
 		return s.graph.WorkspaceInfo(member), nil
 
+	case "falcon_insights":
+		top := 10
+		if v, ok := args["top"].(float64); ok && v > 0 {
+			top = int(v)
+		}
+		return s.graph.Insights(top), nil
+
 	case "falcon_remember":
 		return handleRemember(args, s)
 
