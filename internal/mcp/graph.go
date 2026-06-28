@@ -276,6 +276,248 @@ func (g *GraphIndex) SymbolLookup(name string, kind string) string {
 	return b.String()
 }
 
+// resolveSymbol picks the best symbol id for a name: exact-name match preferred,
+// then deterministic by id. Accepts simple name or Qualified.Name.
+func (g *GraphIndex) resolveSymbol(name string) (artifacts.SymbolRow, bool) {
+	cands := g.SymsByName[strings.ToLower(name)]
+	if len(cands) == 0 {
+		// Try qualified-name suffix match (e.g. "Type.method").
+		for _, s := range g.Symbols {
+			if strings.EqualFold(s.QualifiedName, name) {
+				cands = append(cands, s)
+			}
+		}
+	}
+	if len(cands) == 0 {
+		return artifacts.SymbolRow{}, false
+	}
+	best := cands[0]
+	for _, s := range cands[1:] {
+		if s.SymbolID < best.SymbolID {
+			best = s
+		}
+	}
+	return best, true
+}
+
+// symbolEdgeType reports the relation if e connects two symbols (CALLS or
+// REFERENCES), else "".
+func symbolEdgeType(e artifacts.EdgeRow) string {
+	if strings.EqualFold(e.SrcType, "symbol") && strings.EqualFold(e.DstType, "symbol") &&
+		(e.EdgeType == "CALLS" || e.EdgeType == "REFERENCES") {
+		return e.EdgeType
+	}
+	return ""
+}
+
+// ShortestPath returns the shortest call/reference path between two symbols
+// (treating edges as undirected), or a message if none exists.
+func (g *GraphIndex) ShortestPath(aName, bName string) string {
+	a, ok := g.resolveSymbol(aName)
+	if !ok {
+		return fmt.Sprintf("Symbol not found: %s", aName)
+	}
+	b, ok := g.resolveSymbol(bName)
+	if !ok {
+		return fmt.Sprintf("Symbol not found: %s", bName)
+	}
+	if a.SymbolID == b.SymbolID {
+		return fmt.Sprintf("`%s` and `%s` are the same symbol.", aName, bName)
+	}
+
+	type step struct {
+		id   string
+		rel  string
+		from string
+	}
+	prev := map[string]step{a.SymbolID: {id: a.SymbolID}}
+	queue := []string{a.SymbolID}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == b.SymbolID {
+			break
+		}
+		// Deterministic neighbour order.
+		var nbrs []step
+		for _, e := range g.EdgesBySrc[cur] {
+			if rel := symbolEdgeType(e); rel != "" {
+				nbrs = append(nbrs, step{id: e.DstID, rel: rel, from: cur})
+			}
+		}
+		for _, e := range g.EdgesByDst[cur] {
+			if rel := symbolEdgeType(e); rel != "" {
+				nbrs = append(nbrs, step{id: e.SrcID, rel: rel, from: cur})
+			}
+		}
+		sort.Slice(nbrs, func(i, j int) bool { return nbrs[i].id < nbrs[j].id })
+		for _, n := range nbrs {
+			if _, seen := prev[n.id]; !seen {
+				prev[n.id] = n
+				queue = append(queue, n.id)
+			}
+		}
+	}
+
+	if _, ok := prev[b.SymbolID]; !ok {
+		return fmt.Sprintf("No call/reference path found between `%s` and `%s`.", aName, bName)
+	}
+
+	// Reconstruct.
+	var chain []step
+	for cur := b.SymbolID; cur != a.SymbolID; {
+		s := prev[cur]
+		chain = append([]step{s}, chain...)
+		cur = s.from
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Shortest path (%d hops): %s", len(chain), g.symLabel(a.SymbolID))
+	for _, s := range chain {
+		fmt.Fprintf(&sb, " --%s--> %s", s.rel, g.symLabel(s.id))
+	}
+	sb.WriteString("\n")
+	return sb.String()
+}
+
+func (g *GraphIndex) symLabel(id string) string {
+	if s, ok := g.SymByID[id]; ok {
+		return s.QualifiedName
+	}
+	return id
+}
+
+// Hubs returns the top-N most connected symbols (degree centrality over CALLS +
+// REFERENCES edges) — the "god nodes" / core abstractions.
+func (g *GraphIndex) Hubs(n int) string {
+	deg := map[string]int{}
+	for _, e := range g.Edges {
+		if symbolEdgeType(e) == "" {
+			continue
+		}
+		deg[e.SrcID]++
+		deg[e.DstID]++
+	}
+	type hd struct {
+		id  string
+		deg int
+	}
+	var hubs []hd
+	for id, d := range deg {
+		hubs = append(hubs, hd{id, d})
+	}
+	sort.Slice(hubs, func(i, j int) bool {
+		if hubs[i].deg != hubs[j].deg {
+			return hubs[i].deg > hubs[j].deg
+		}
+		return hubs[i].id < hubs[j].id
+	})
+	if n <= 0 || n > len(hubs) {
+		n = len(hubs)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Hubs (top %d by call/reference degree)\n\n", n)
+	for i := 0; i < n; i++ {
+		s, ok := g.SymByID[hubs[i].id]
+		if !ok {
+			continue
+		}
+		path := ""
+		if f, ok := g.FileByID[s.FileID]; ok {
+			path = f.Path
+		}
+		fmt.Fprintf(&b, "%d. `%s` (%s) — %d edges — %s:%d\n", i+1, s.QualifiedName, s.Kind, hubs[i].deg, path, s.StartLine)
+	}
+	return b.String()
+}
+
+// Communities groups the symbol call/reference graph into clusters using
+// deterministic label propagation (no LLM): each node iteratively adopts the
+// most common label among its neighbours, ties broken by smallest label. Seeded
+// by node id and iterated in sorted order, the result is fully reproducible.
+// Each community is named by its highest-degree member (its core abstraction).
+func (g *GraphIndex) Communities(maxShow int) string {
+	adj := map[string][]string{}
+	deg := map[string]int{}
+	for _, e := range g.Edges {
+		if symbolEdgeType(e) == "" || e.SrcID == e.DstID {
+			continue
+		}
+		adj[e.SrcID] = append(adj[e.SrcID], e.DstID)
+		adj[e.DstID] = append(adj[e.DstID], e.SrcID)
+		deg[e.SrcID]++
+		deg[e.DstID]++
+	}
+	ids := make([]string, 0, len(adj))
+	for id := range adj {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	label := make(map[string]string, len(ids))
+	for _, id := range ids {
+		label[id] = id
+	}
+	for iter := 0; iter < 10; iter++ {
+		changed := false
+		for _, id := range ids {
+			freq := map[string]int{}
+			for _, nb := range adj[id] {
+				freq[label[nb]]++
+			}
+			best, bestN := label[id], -1
+			for lbl, n := range freq {
+				if n > bestN || (n == bestN && lbl < best) {
+					best, bestN = lbl, n
+				}
+			}
+			if best != label[id] {
+				label[id] = best
+				changed = true
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	groups := map[string][]string{}
+	for _, id := range ids {
+		groups[label[id]] = append(groups[label[id]], id)
+	}
+	type comm struct {
+		members []string
+		rep     string
+		repDeg  int
+	}
+	var comms []comm
+	for _, members := range groups {
+		c := comm{members: members, repDeg: -1}
+		for _, m := range members {
+			if deg[m] > c.repDeg || (deg[m] == c.repDeg && m < c.rep) {
+				c.rep, c.repDeg = m, deg[m]
+			}
+		}
+		comms = append(comms, c)
+	}
+	sort.Slice(comms, func(i, j int) bool {
+		if len(comms[i].members) != len(comms[j].members) {
+			return len(comms[i].members) > len(comms[j].members)
+		}
+		return comms[i].rep < comms[j].rep
+	})
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Communities (%d clusters in the symbol graph)\n\n", len(comms))
+	if maxShow <= 0 || maxShow > len(comms) {
+		maxShow = len(comms)
+	}
+	for i := 0; i < maxShow; i++ {
+		c := comms[i]
+		fmt.Fprintf(&b, "%d. %s (%d symbols, core: `%s`)\n", i+1, g.symLabel(c.rep), len(c.members), g.symLabel(c.rep))
+	}
+	return b.String()
+}
+
 // PackageInfo returns a summary for a package by name.
 func (g *GraphIndex) PackageInfo(name string) string {
 	pkg, ok := g.PkgByName[name]

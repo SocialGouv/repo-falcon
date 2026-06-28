@@ -28,6 +28,28 @@ func HandleToolCall(name string, args map[string]any, s *Server) (string, error)
 		kind, _ := args["kind"].(string)
 		return s.graph.SymbolLookup(symName, kind), nil
 
+	case "falcon_path":
+		from, _ := args["from"].(string)
+		to, _ := args["to"].(string)
+		if from == "" || to == "" {
+			return "", fmt.Errorf("missing required parameters: from, to")
+		}
+		return s.graph.ShortestPath(from, to), nil
+
+	case "falcon_hubs":
+		top := 20
+		if v, ok := args["top"].(float64); ok && v > 0 {
+			top = int(v)
+		}
+		return s.graph.Hubs(top), nil
+
+	case "falcon_communities":
+		top := 25
+		if v, ok := args["top"].(float64); ok && v > 0 {
+			top = int(v)
+		}
+		return s.graph.Communities(top), nil
+
 	case "falcon_package_info":
 		pkgName, _ := args["name"].(string)
 		if pkgName == "" {

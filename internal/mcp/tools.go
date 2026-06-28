@@ -51,6 +51,50 @@ func AllTools() []ToolDef {
 			},
 		},
 		{
+			Name:        "falcon_path",
+			Description: "Find the shortest call/reference path between two symbols (how are A and B connected?).",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"from": map[string]any{
+						"type":        "string",
+						"description": "Source symbol name",
+					},
+					"to": map[string]any{
+						"type":        "string",
+						"description": "Target symbol name",
+					},
+				},
+				"required": []string{"from", "to"},
+			},
+		},
+		{
+			Name:        "falcon_hubs",
+			Description: "List the most connected symbols (degree centrality over calls/references) — the core abstractions / god nodes.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"top": map[string]any{
+						"type":        "number",
+						"description": "How many hubs to return (default 20)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "falcon_communities",
+			Description: "Cluster the symbol graph into communities of related symbols (deterministic label propagation, no LLM). Useful for a high-level map of cohesive areas.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"top": map[string]any{
+						"type":        "number",
+						"description": "How many of the largest communities to return (default 25)",
+					},
+				},
+			},
+		},
+		{
 			Name:        "falcon_package_info",
 			Description: "Get information about a package: its files, symbols, dependencies, and dependents.",
 			InputSchema: map[string]any{
