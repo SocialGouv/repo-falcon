@@ -69,7 +69,8 @@ func newCommunitiesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), g.Communities(top))
+			labels := mcp.LoadCommunityLabels(snapshot) // optional LLM overlay
+			fmt.Fprint(cmd.OutOrStdout(), g.CommunitiesWithLabels(top, labels))
 			return nil
 		},
 	}

@@ -55,6 +55,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newPathCmd())
 	cmd.AddCommand(newHubsCmd())
 	cmd.AddCommand(newCommunitiesCmd())
+	cmd.AddCommand(newLabelCmd())
 
 	// Cobra's default help/usage outputs include timestamps only if we log them; we don't.
 	cmd.SetContext(context.Background())

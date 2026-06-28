@@ -386,6 +386,10 @@ func (g *GraphIndex) symLabel(id string) string {
 	return id
 }
 
+// SymbolLabel returns the qualified name for a symbol id (exported for callers
+// building LLM prompts).
+func (g *GraphIndex) SymbolLabel(id string) string { return g.symLabel(id) }
+
 // Hubs returns the top-N most connected symbols (degree centrality over CALLS +
 // REFERENCES edges) — the "god nodes" / core abstractions.
 func (g *GraphIndex) Hubs(n int) string {
@@ -430,12 +434,20 @@ func (g *GraphIndex) Hubs(n int) string {
 	return b.String()
 }
 
-// Communities groups the symbol call/reference graph into clusters using
-// deterministic label propagation (no LLM): each node iteratively adopts the
-// most common label among its neighbours, ties broken by smallest label. Seeded
-// by node id and iterated in sorted order, the result is fully reproducible.
-// Each community is named by its highest-degree member (its core abstraction).
-func (g *GraphIndex) Communities(maxShow int) string {
+// Community is one cluster of the symbol graph: its members and its
+// highest-degree representative (the core abstraction).
+type Community struct {
+	RepID    string   // symbol id of the most central member
+	RepLabel string   // qualified name of the representative
+	Members  []string // symbol ids
+}
+
+// ComputeCommunities clusters the symbol call/reference graph with deterministic
+// label propagation (no LLM): each node iteratively adopts the most common label
+// among its neighbours, ties broken by smallest label. Seeded by node id and
+// iterated in sorted order, the result is fully reproducible. Returned sorted by
+// size desc, then representative.
+func (g *GraphIndex) ComputeCommunities() []Community {
 	adj := map[string][]string{}
 	deg := map[string]int{}
 	for _, e := range g.Edges {
@@ -484,27 +496,37 @@ func (g *GraphIndex) Communities(maxShow int) string {
 	for _, id := range ids {
 		groups[label[id]] = append(groups[label[id]], id)
 	}
-	type comm struct {
-		members []string
-		rep     string
-		repDeg  int
-	}
-	var comms []comm
+	var comms []Community
 	for _, members := range groups {
-		c := comm{members: members, repDeg: -1}
+		c := Community{Members: members}
+		repDeg := -1
 		for _, m := range members {
-			if deg[m] > c.repDeg || (deg[m] == c.repDeg && m < c.rep) {
-				c.rep, c.repDeg = m, deg[m]
+			if deg[m] > repDeg || (deg[m] == repDeg && m < c.RepID) {
+				c.RepID, repDeg = m, deg[m]
 			}
 		}
+		c.RepLabel = g.symLabel(c.RepID)
 		comms = append(comms, c)
 	}
 	sort.Slice(comms, func(i, j int) bool {
-		if len(comms[i].members) != len(comms[j].members) {
-			return len(comms[i].members) > len(comms[j].members)
+		if len(comms[i].Members) != len(comms[j].Members) {
+			return len(comms[i].Members) > len(comms[j].Members)
 		}
-		return comms[i].rep < comms[j].rep
+		return comms[i].RepID < comms[j].RepID
 	})
+	return comms
+}
+
+// Communities renders the deterministic clusters as text. labels, when present,
+// maps a community RepID to an LLM-generated name (the optional enrichment
+// overlay); the clustering itself is always deterministic.
+func (g *GraphIndex) Communities(maxShow int) string {
+	return g.CommunitiesWithLabels(maxShow, nil)
+}
+
+// CommunitiesWithLabels renders clusters, showing an LLM label when available.
+func (g *GraphIndex) CommunitiesWithLabels(maxShow int, labels map[string]string) string {
+	comms := g.ComputeCommunities()
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Communities (%d clusters in the symbol graph)\n\n", len(comms))
@@ -513,7 +535,11 @@ func (g *GraphIndex) Communities(maxShow int) string {
 	}
 	for i := 0; i < maxShow; i++ {
 		c := comms[i]
-		fmt.Fprintf(&b, "%d. %s (%d symbols, core: `%s`)\n", i+1, g.symLabel(c.rep), len(c.members), g.symLabel(c.rep))
+		if name := labels[c.RepID]; name != "" {
+			fmt.Fprintf(&b, "%d. %s — %d symbols (core: `%s`)\n", i+1, name, len(c.Members), c.RepLabel)
+		} else {
+			fmt.Fprintf(&b, "%d. %s (%d symbols, core: `%s`)\n", i+1, c.RepLabel, len(c.Members), c.RepLabel)
+		}
 	}
 	return b.String()
 }

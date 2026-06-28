@@ -48,7 +48,7 @@ func HandleToolCall(name string, args map[string]any, s *Server) (string, error)
 		if v, ok := args["top"].(float64); ok && v > 0 {
 			top = int(v)
 		}
-		return s.graph.Communities(top), nil
+		return s.graph.CommunitiesWithLabels(top, LoadCommunityLabels(s.SnapshotDir)), nil
 
 	case "falcon_package_info":
 		pkgName, _ := args["name"].(string)
