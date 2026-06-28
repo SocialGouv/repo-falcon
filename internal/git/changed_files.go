@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"repofalcon/internal/graph"
+	"repofalcon/internal/secure"
 )
 
 // Change represents a single path-level change detected by git.
@@ -35,9 +36,14 @@ func ChangedFiles(repoRoot, base, head string) ([]Change, error) {
 	if base == "" || head == "" {
 		return nil, fmt.Errorf("git changed-files: base and head must be non-empty")
 	}
+	// Reject option-injection / control chars before passing refs to git.
+	if !secure.ValidGitRef(base) || !secure.ValidGitRef(head) {
+		return nil, fmt.Errorf("git changed-files: invalid base/head ref")
+	}
 
 	// Enable rename detection (otherwise renames may appear as delete+add depending on heuristics).
-	cmd := exec.Command("git", "-C", repoRoot, "diff", "--name-status", "-M", "-z", base, head)
+	// The trailing "--" stops git interpreting a ref as a pathspec.
+	cmd := exec.Command("git", "-C", repoRoot, "diff", "--name-status", "-M", "-z", base, head, "--")
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {

@@ -11,6 +11,7 @@ import (
 	"repofalcon/internal/llm"
 	"repofalcon/internal/logging"
 	"repofalcon/internal/mcp"
+	"repofalcon/internal/secure"
 )
 
 // newLabelCmd: `falcon label` — OPTIONAL LLM enrichment. Names the deterministic
@@ -62,7 +63,7 @@ func newLabelCmd() *cobra.Command {
 					lg.Warn("llm labeling failed; keeping unlabeled clusters", "err", err)
 					break
 				}
-				labels[c.RepID] = sanitizeLabel(name)
+				labels[c.RepID] = secure.SanitizeLabel(name)
 				labeled++
 			}
 			if labeled == 0 {
@@ -100,16 +101,4 @@ func labelUserPrompt(g *mcp.GraphIndex, c mcp.Community) string {
 	}
 	return fmt.Sprintf("Core symbol: %s\nMembers (sample): %s\n\nLabel:",
 		c.RepLabel, strings.Join(names, ", "))
-}
-
-func sanitizeLabel(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.Trim(s, "\"'`.")
-	if i := strings.IndexAny(s, "\n\r"); i >= 0 {
-		s = s[:i]
-	}
-	if len(s) > 60 {
-		s = s[:60]
-	}
-	return strings.TrimSpace(s)
 }
